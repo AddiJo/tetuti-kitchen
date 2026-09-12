@@ -16,7 +16,7 @@
     <link rel="preload" as="image" href="assets/paket-hantaran.jpg" />
     <link rel="preload" as="image" href="assets/nasi-kotak.jpg" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/styles.css" />
@@ -37,9 +37,10 @@
           <span class="brand-name"><span class="brand-tetuti">Tetuti</span> Kitchen</span>
         </a>
         <nav class="nav-links">
+          <a class="nav-text" href="#beranda">Beranda</a>
           <a class="nav-text" href="#menu">Produk</a>
           <a class="nav-text" href="#cara-pesan">Cara pesan</a>
-          <a class="btn btn-primary" data-wa-chat href="#">Chat WA</a>
+          <a class="btn btn-primary nav-chat" data-wa-chat href="#">Chat WA</a>
         </nav>
       </div>
     </header>
@@ -63,7 +64,7 @@
         <div class="wrap">
           <div class="section-head">
             <div>
-              <p class="script">Menu andalan</p>
+              <p class="kicker">Menu andalan</p>
               <h2>Tiga produk siap pesan</h2>
               <p>Pilih jumlah, klik Pesan, langsung lanjut ke WhatsApp.</p>
             </div>
@@ -76,7 +77,7 @@
         <div class="wrap">
           <div class="section-head">
             <div>
-              <p class="script">Gampang banget</p>
+              <p class="kicker">Gampang banget</p>
               <h2>Cara pesan</h2>
               <p>Stok, harga, dan pengiriman dikonfirmasi di WhatsApp.</p>
             </div>
@@ -109,7 +110,7 @@
       </div>
     </footer>
 
-    <a class="wa-dock" data-wa-chat href="#">
+    <a class="wa-dock" data-wa-chat href="#" aria-hidden="true" tabindex="-1">
       <span class="wa-dock-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24">
           <path

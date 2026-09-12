@@ -39,8 +39,8 @@ body {
     #0c0706 0%,
     #2a0e0c 22%,
     #7a1f18 52%,
-    #c45a32 78%,
-    #f0c090 100%
+    #b44a28 78%,
+    #d4a06a 100%
   );
 }
 
@@ -125,11 +125,10 @@ button {
 }
 
 .brand-tetuti {
-  font-family: "Great Vibes", cursive;
-  font-style: normal;
-  font-weight: 400;
-  font-size: 1.85rem;
-  color: #f3d2b0;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.32rem;
+  color: #f6e4cf;
   margin-right: 6px;
 }
 
@@ -139,6 +138,50 @@ button {
   gap: 22px;
   color: rgba(246, 228, 207, 0.82);
   font-weight: 600;
+}
+
+.nav-text {
+  position: relative;
+  padding: 6px 0;
+  color: rgba(246, 228, 207, 0.78);
+  transition: color 0.2s ease;
+}
+
+.nav-text:hover,
+.nav-text.is-active {
+  color: #fff6ea;
+}
+
+.nav-text::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #f3d2b0;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+.nav-text:hover::after,
+.nav-text.is-active::after {
+  transform: scaleX(1);
+}
+
+.nav-chat {
+  overflow: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, max-width 0.25s ease, padding 0.25s ease;
+}
+
+.nav-chat.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  max-width: 0;
+  padding-inline: 0;
+  transform: scale(0.92);
 }
 
 .btn {
@@ -179,12 +222,14 @@ button {
   place-items: center;
 }
 
-.script {
-  font-family: "Great Vibes", cursive;
-  color: var(--maroon);
-  font-size: 2rem;
-  line-height: 1;
-  margin: 8px 0 6px;
+.kicker {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--maroon-dark);
+  margin-bottom: 8px;
 }
 
 h1,
@@ -250,19 +295,20 @@ h2 {
 
 .section-head {
   margin-bottom: 28px;
-}
-
-.section-head .script {
-  color: #f3d2b0;
+  background: rgba(255, 248, 240, 0.94);
+  border: 1px solid rgba(42, 22, 18, 0.08);
+  border-radius: 22px;
+  padding: 20px 22px;
+  box-shadow: 0 10px 28px rgba(12, 7, 6, 0.1);
 }
 
 .section-head h2 {
   font-size: clamp(2rem, 4vw, 3rem);
-  color: #fff6ea;
+  color: var(--ink);
 }
 
 .section-head p:last-child {
-  color: rgba(255, 246, 234, 0.78);
+  color: #4a332c;
   margin-top: 6px;
 }
 
@@ -420,8 +466,8 @@ h2 {
 
 .footer {
   padding: 28px 0 calc(88px + env(safe-area-inset-bottom));
-  color: rgba(255, 246, 234, 0.78);
-  border-top: 1px solid rgba(255, 244, 230, 0.16);
+  color: #3d2a24;
+  border-top: 1px solid rgba(42, 22, 18, 0.12);
 }
 
 .footer-inner {
@@ -433,16 +479,15 @@ h2 {
 
 .wa-dock {
   position: fixed;
-  left: 50%;
+  right: 18px;
   bottom: calc(18px + env(safe-area-inset-bottom));
   z-index: 50;
-  translate: -50% 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 16px 10px 10px;
   border-radius: 999px;
-  background: rgba(18, 10, 8, 0.78);
+  background: rgba(18, 10, 8, 0.86);
   color: #f6e4cf;
   border: 1px solid rgba(255, 244, 230, 0.14);
   backdrop-filter: blur(16px);
@@ -450,6 +495,23 @@ h2 {
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.28s ease, transform 0.28s ease, visibility 0.28s ease;
+}
+
+.wa-dock.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+}
+
+.wa-dock.is-visible:hover {
+  color: #fff6ea;
+  transform: translateY(-2px);
 }
 
 .wa-dock-icon {
@@ -476,8 +538,12 @@ h2 {
 }
 
 @media (max-width: 980px) {
+  .nav-links {
+    gap: 12px;
+  }
+
   .nav-text {
-    display: none;
+    font-size: 0.85rem;
   }
 
   .grid,
@@ -529,6 +595,29 @@ h2 {
 
   .section {
     padding: 40px 0;
+  }
+
+  .nav-inner {
+    height: 64px;
+  }
+
+  .nav-links {
+    gap: 10px;
+  }
+
+  .nav-text {
+    font-size: 0.78rem;
+  }
+
+  .nav-chat {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .nav-text[href="#beranda"] {
+    display: none;
   }
 }
 

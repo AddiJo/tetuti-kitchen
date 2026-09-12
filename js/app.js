@@ -96,6 +96,67 @@ function hydrateBrand() {
   });
 }
 
+function bindWaDock() {
+  const dock = document.querySelector(".wa-dock");
+  const navChat = document.querySelector(".nav-chat");
+  const hero = document.getElementById("beranda");
+  if (!dock || !hero) return;
+
+  const setVisible = (showDock) => {
+    dock.classList.toggle("is-visible", showDock);
+    dock.setAttribute("aria-hidden", showDock ? "false" : "true");
+    dock.tabIndex = showDock ? 0 : -1;
+    if (navChat) {
+      navChat.classList.toggle("is-hidden", showDock);
+      navChat.setAttribute("aria-hidden", showDock ? "true" : "false");
+      navChat.tabIndex = showDock ? -1 : 0;
+    }
+  };
+
+  const observer = new IntersectionObserver(
+    ([entry]) => setVisible(!entry.isIntersecting),
+    { threshold: 0.18 }
+  );
+  observer.observe(hero);
+}
+
+function bindNavSpy() {
+  const links = [...document.querySelectorAll(".nav-text[href^='#']")];
+  const sections = links
+    .map((link) => document.querySelector(link.getAttribute("href")))
+    .filter(Boolean);
+
+  const setActive = (id) => {
+    links.forEach((link) => {
+      const on = link.getAttribute("href") === `#${id}`;
+      link.classList.toggle("is-active", on);
+      if (on) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  };
+
+  const update = () => {
+    const marker = window.scrollY + Math.min(220, window.innerHeight * 0.28);
+    let current = sections[0]?.id || "beranda";
+    sections.forEach((section) => {
+      if (section.offsetTop <= marker) current = section.id;
+    });
+    setActive(current);
+  };
+
+  links.forEach((link) => {
+    link.addEventListener("click", () => {
+      const id = link.getAttribute("href")?.slice(1);
+      if (id) setActive(id);
+    });
+  });
+
+  update();
+  window.addEventListener("scroll", update, { passive: true });
+}
+
 hydrateBrand();
 renderProducts();
 bindGrid();
+bindWaDock();
+bindNavSpy();
