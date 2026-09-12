@@ -10,14 +10,14 @@ function cycleHeroShots() {
   const compact = window.matchMedia("(max-width: 620px)").matches;
   const layouts = compact
     ? [
-        { x: "0%", y: 18, scale: 0.9, rotate: -8, zIndex: 2 },
-        { x: "26%", y: 0, scale: 0.86, rotate: 7, zIndex: 1 },
-        { x: "10%", y: 34, scale: 1, rotate: 2, zIndex: 3 },
+        { x: "-6%", y: 28, scale: 0.86, rotate: -9, zIndex: 2 },
+        { x: "34%", y: 16, scale: 0.84, rotate: 9, zIndex: 1 },
+        { x: "12%", y: 40, scale: 1, rotate: 1, zIndex: 3 },
       ]
     : [
-        { x: "0%", y: 32, scale: 0.9, rotate: -9, zIndex: 2 },
-        { x: "36%", y: 0, scale: 0.86, rotate: 8, zIndex: 1 },
-        { x: "18%", y: 64, scale: 1, rotate: 2, zIndex: 3 },
+        { x: "-10%", y: 48, scale: 0.86, rotate: -10, zIndex: 2 },
+        { x: "38%", y: 28, scale: 0.84, rotate: 10, zIndex: 1 },
+        { x: "12%", y: 56, scale: 1, rotate: 1, zIndex: 3 },
       ];
 
   let offset = 0;
@@ -61,15 +61,9 @@ function play() {
   );
 
   animate(
-    ".hero-copy > *",
-    { y: [28, 0], opacity: [0, 1] },
-    { delay: stagger(0.08, { startDelay: 0.12 }), duration: 0.7, ease: easeOut }
-  );
-
-  animate(
     ".hero-shot",
     { opacity: [0, 1] },
-    { delay: stagger(0.12, { startDelay: 0.2 }), duration: 0.8, ease: easeOut }
+    { delay: stagger(0.12, { startDelay: 0.15 }), duration: 0.8, ease: easeOut }
   );
 
   window.setTimeout(cycleHeroShots, 900);
