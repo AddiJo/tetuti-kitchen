@@ -7,42 +7,36 @@ function cycleHeroShots() {
   const shots = [...document.querySelectorAll(".hero-shot")];
   if (shots.length < 2) return;
 
-  const compact = window.matchMedia("(max-width: 620px)").matches;
-  const layouts = compact
-    ? [
-        { x: "-6%", y: 28, scale: 0.86, rotate: -9, zIndex: 2 },
-        { x: "34%", y: 16, scale: 0.84, rotate: 9, zIndex: 1 },
-        { x: "12%", y: 40, scale: 1, rotate: 1, zIndex: 3 },
-      ]
-    : [
-        { x: "-10%", y: 48, scale: 0.86, rotate: -10, zIndex: 2 },
-        { x: "38%", y: 28, scale: 0.84, rotate: 10, zIndex: 1 },
-        { x: "12%", y: 56, scale: 1, rotate: 1, zIndex: 3 },
-      ];
+  const layoutsFor = () =>
+    window.matchMedia("(max-width: 620px)").matches
+      ? [
+          { x: "-82%", y: 28, scale: 0.86, rotate: -9, zIndex: 2 },
+          { x: "-18%", y: 16, scale: 0.84, rotate: 9, zIndex: 1 },
+          { x: "-50%", y: 40, scale: 1, rotate: 1, zIndex: 3 },
+        ]
+      : [
+          { x: "-88%", y: 48, scale: 0.86, rotate: -10, zIndex: 2 },
+          { x: "-8%", y: 28, scale: 0.84, rotate: 10, zIndex: 1 },
+          { x: "-50%", y: 56, scale: 1, rotate: 1, zIndex: 3 },
+        ];
 
   let offset = 0;
 
-  const layout = (duration) => {
+  const layout = () => {
+    const layouts = layoutsFor();
     shots.forEach((el, i) => {
       const slot = layouts[(i + offset) % layouts.length];
       el.style.zIndex = String(slot.zIndex);
-      animate(
-        el,
-        {
-          x: slot.x,
-          y: slot.y,
-          scale: slot.scale,
-          rotate: slot.rotate,
-        },
-        { duration, ease: easeOut }
-      );
+      el.style.translate = `${slot.x} ${slot.y}px`;
+      el.style.scale = String(slot.scale);
+      el.style.rotate = `${slot.rotate}deg`;
     });
   };
 
   window.setInterval(() => {
     if (document.hidden) return;
     offset = (offset + 1) % shots.length;
-    layout(0.8);
+    layout();
   }, 3000);
 }
 
