@@ -213,6 +213,27 @@ h2 {
   will-change: transform;
 }
 
+.shot-1 {
+  z-index: 2;
+  translate: -10% 48px;
+  scale: 0.86;
+  rotate: -10deg;
+}
+
+.shot-2 {
+  z-index: 1;
+  translate: 38% 28px;
+  scale: 0.84;
+  rotate: 10deg;
+}
+
+.shot-3 {
+  z-index: 3;
+  translate: 12% 56px;
+  scale: 1;
+  rotate: 1deg;
+}
+
 .hero-shot img {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -398,7 +419,7 @@ h2 {
 }
 
 .footer {
-  padding: 28px 0 calc(40px + env(safe-area-inset-bottom));
+  padding: 28px 0 calc(88px + env(safe-area-inset-bottom));
   color: rgba(255, 246, 234, 0.78);
   border-top: 1px solid rgba(255, 244, 230, 0.16);
 }
@@ -410,24 +431,41 @@ h2 {
   flex-wrap: wrap;
 }
 
-.wa-float {
+.wa-dock {
   position: fixed;
-  right: 18px;
+  left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom));
   z-index: 50;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #25d366;
-  color: white;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 12px 24px rgba(37, 211, 102, 0.35);
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 10px 10px;
+  border-radius: 999px;
+  background: rgba(18, 10, 8, 0.78);
+  color: #f6e4cf;
+  border: 1px solid rgba(255, 244, 230, 0.14);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(12, 7, 6, 0.28);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
-.wa-float svg {
-  width: 28px;
-  height: 28px;
+.wa-dock-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #25d366;
+  color: white;
+  flex-shrink: 0;
+}
+
+.wa-dock-icon svg {
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
@@ -467,6 +505,24 @@ h2 {
     width: 72%;
   }
 
+  .shot-1 {
+    translate: -6% 28px;
+    scale: 0.86;
+    rotate: -9deg;
+  }
+
+  .shot-2 {
+    translate: 34% 16px;
+    scale: 0.84;
+    rotate: 9deg;
+  }
+
+  .shot-3 {
+    translate: 12% 40px;
+    scale: 1;
+    rotate: 1deg;
+  }
+
   .card-media {
     height: 240px;
   }
@@ -476,8 +532,6 @@ h2 {
   }
 }
 
-.js-motion .nav,
-.js-motion .hero-shot,
 .js-motion #menu .section-head,
 .js-motion #product-grid .card,
 .js-motion #cara-pesan .section-head,
@@ -490,8 +544,6 @@ h2 {
     animation: none;
   }
 
-  .js-motion .nav,
-  .js-motion .hero-shot,
   .js-motion #menu .section-head,
   .js-motion #product-grid .card,
   .js-motion #cara-pesan .section-head,

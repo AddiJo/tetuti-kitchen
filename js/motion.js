@@ -39,8 +39,6 @@ function cycleHeroShots() {
     });
   };
 
-  layout(0.01);
-
   window.setInterval(() => {
     if (document.hidden) return;
     offset = (offset + 1) % shots.length;
@@ -54,19 +52,7 @@ function play() {
     return;
   }
 
-  animate(
-    ".nav",
-    { y: [-24, 0], opacity: [0, 1] },
-    { duration: 0.6, ease: easeOut }
-  );
-
-  animate(
-    ".hero-shot",
-    { opacity: [0, 1] },
-    { delay: stagger(0.12, { startDelay: 0.15 }), duration: 0.8, ease: easeOut }
-  );
-
-  window.setTimeout(cycleHeroShots, 900);
+  cycleHeroShots();
 
   inView(
     "#menu",
@@ -115,12 +101,6 @@ function play() {
   } catch (err) {
     console.warn("Motion hover skipped", err);
   }
-
-  animate(
-    ".wa-float",
-    { scale: [1, 1.08, 1] },
-    { duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 1.2 }
-  );
 }
 
 if (document.readyState === "loading") {
