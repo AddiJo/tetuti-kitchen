@@ -92,21 +92,31 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 700;
 }
 
-.brand-mark {
-  min-width: 42px;
-  height: 36px;
-  padding: 0 8px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--maroon);
-  color: white;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  font-weight: 700;
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.28rem;
+  color: var(--maroon);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.brand-tetuti {
+  font-family: "Great Vibes", cursive;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 1.85rem;
+  color: var(--maroon-dark);
+  margin-right: 6px;
 }
 
 .nav-links {
