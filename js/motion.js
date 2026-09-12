@@ -3,6 +3,51 @@ import { animate, inView, stagger, hover } from "https://cdn.jsdelivr.net/npm/mo
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const easeOut = [0.22, 1, 0.36, 1];
 
+function cycleHeroShots() {
+  const shots = [...document.querySelectorAll(".hero-shot")];
+  if (shots.length < 2) return;
+
+  const compact = window.matchMedia("(max-width: 620px)").matches;
+  const layouts = compact
+    ? [
+        { x: "0%", y: 18, scale: 0.9, rotate: -8, zIndex: 2 },
+        { x: "26%", y: 0, scale: 0.86, rotate: 7, zIndex: 1 },
+        { x: "10%", y: 34, scale: 1, rotate: 2, zIndex: 3 },
+      ]
+    : [
+        { x: "0%", y: 32, scale: 0.9, rotate: -9, zIndex: 2 },
+        { x: "36%", y: 0, scale: 0.86, rotate: 8, zIndex: 1 },
+        { x: "18%", y: 64, scale: 1, rotate: 2, zIndex: 3 },
+      ];
+
+  let offset = 0;
+
+  const layout = (duration) => {
+    shots.forEach((el, i) => {
+      const slot = layouts[(i + offset) % layouts.length];
+      el.style.zIndex = String(slot.zIndex);
+      animate(
+        el,
+        {
+          x: slot.x,
+          y: slot.y,
+          scale: slot.scale,
+          rotate: slot.rotate,
+        },
+        { duration, ease: easeOut }
+      );
+    });
+  };
+
+  layout(0.01);
+
+  window.setInterval(() => {
+    if (document.hidden) return;
+    offset = (offset + 1) % shots.length;
+    layout(0.8);
+  }, 3000);
+}
+
 function play() {
   if (reduced) {
     document.documentElement.classList.remove("js-motion");
@@ -26,6 +71,8 @@ function play() {
     { opacity: [0, 1] },
     { delay: stagger(0.12, { startDelay: 0.2 }), duration: 0.8, ease: easeOut }
   );
+
+  window.setTimeout(cycleHeroShots, 900);
 
   inView(
     "#menu",
