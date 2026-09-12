@@ -1,10 +1,3 @@
-const formatRupiah = (n) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(n);
-
 const qtyState = {};
 
 function waLink(text) {
@@ -13,61 +6,47 @@ function waLink(text) {
 }
 
 function orderMessage(product, qty) {
-  const total = product.price * qty;
   return [
     `Halo ${window.TETUTI.storeName}`,
     "",
     "Saya ingin pesan:",
-    `• ${qty}x ${product.name} (${formatRupiah(product.price)})`,
+    `• ${qty}x ${product.name}`,
     "",
-    `Total: ${formatRupiah(total)}`,
-    "",
-    "Mohon info ketersediaan dan ongkirnya. Terima kasih.",
+    "Mohon info harga, ketersediaan, dan ongkirnya. Terima kasih.",
   ].join("\n");
 }
 
-function renderProducts(filter = "semua") {
+function renderProducts() {
   const root = document.getElementById("product-grid");
-  const items = window.TETUTI_PRODUCTS.filter(
-    (item) => filter === "semua" || item.category === filter
-  );
-
-  root.innerHTML = items
-    .map((item) => {
-      const qty = qtyState[item.id] || 1;
-      return `
-        <article class="card">
-          <div class="card-media">
-            ${item.badge ? `<span class="badge">${item.badge}</span>` : ""}
-            <img src="${item.image}" alt="${item.name}" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h3 class="serif">${item.name}</h3>
-            <p>${item.desc}</p>
-            <div class="price">${formatRupiah(item.price)}</div>
-            <div class="card-actions">
-              <div class="qty">
-                <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi">−</button>
-                <span id="qty-${item.id}">${qty}</span>
-                <button type="button" data-qty="${item.id}" data-delta="1" aria-label="Tambah">+</button>
-              </div>
-              <button class="btn btn-primary" type="button" data-order="${item.id}">Pesan</button>
+  root.innerHTML = window.TETUTI_PRODUCTS.map((item, index) => {
+    const qty = qtyState[item.id] || 1;
+    const points = (item.highlights || [])
+      .map((line) => `<li>${line}</li>`)
+      .join("");
+    return `
+      <article class="card card-${index}">
+        <div class="card-media">
+          <span class="badge">${item.badge}</span>
+          <img src="${item.image}" alt="${item.name}">
+        </div>
+        <div class="card-body">
+          <p class="hook">${item.hook}</p>
+          <h3>${item.name}</h3>
+          <p>${item.desc}</p>
+          <ul class="highlights">${points}</ul>
+          <div class="price">Harga via WhatsApp</div>
+          <div class="card-actions">
+            <div class="qty">
+              <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi">−</button>
+              <span id="qty-${item.id}">${qty}</span>
+              <button type="button" data-qty="${item.id}" data-delta="1" aria-label="Tambah">+</button>
             </div>
+            <button class="btn btn-primary" type="button" data-order="${item.id}">Pesan</button>
           </div>
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function bindFilters() {
-  document.querySelectorAll(".filter").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter").forEach((el) => el.classList.remove("active"));
-      btn.classList.add("active");
-      renderProducts(btn.dataset.filter);
-    });
-  });
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function bindGrid() {
@@ -93,7 +72,7 @@ function bindGrid() {
 
 function hydrateBrand() {
   const { storeName, tagline, hours, area, whatsappNumber } = window.TETUTI;
-  document.title = `${storeName} — ${tagline}`;
+  document.title = `${storeName} — Homemade`;
   document.querySelectorAll("[data-store]").forEach((el) => {
     el.textContent = storeName;
   });
@@ -107,20 +86,16 @@ function hydrateBrand() {
     el.textContent = area;
   });
 
-  const chat = waLink(
-    `Halo ${storeName}, saya mau tanya menu dan ketersediaan hari ini.`
-  );
+  const chat = waLink(`Halo ${storeName}, saya mau tanya menu dan ketersediaan.`);
   document.querySelectorAll("[data-wa-chat]").forEach((el) => {
     el.setAttribute("href", chat);
   });
 
-  const phonePretty = whatsappNumber.replace(/^62/, "0");
   document.querySelectorAll("[data-phone]").forEach((el) => {
-    el.textContent = phonePretty;
+    el.textContent = whatsappNumber.replace(/^62/, "0");
   });
 }
 
 hydrateBrand();
 renderProducts();
-bindFilters();
 bindGrid();

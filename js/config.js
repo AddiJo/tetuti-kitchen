@@ -1,9 +1,9 @@
 window.TETUTI = {
   storeName: "Tetuti Kitchen",
-  tagline: "Masakan rumahan, rasa istimewa",
+  tagline: "100% Homemade. Pedas nampol, renyahnya bikin nagih.",
   city: "Jakarta",
   // Ganti dengan nomor WhatsApp aktif, format 62... tanpa + atau spasi
-  whatsappNumber: "6281234567890",
-  hours: "Setiap hari, 10.00 – 20.00 WIB",
-  area: "Antar sekitar area kota / bisa pickup",
+  whatsappNumber: "6281284966859",
+  hours: "Pre-order via WhatsApp",
+  area: "Siap antar / pickup",
 };

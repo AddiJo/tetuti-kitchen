@@ -6,17 +6,19 @@
     <title>Tetuti Kitchen</title>
     <meta
       name="description"
-      content="Tetuti Kitchen — masakan rumahan siap pesan via WhatsApp."
+      content="Tetuti Kitchen — Sambal Crispy, Paket Hantaran, dan Nasi Kotak. 100% homemade, pesan via WhatsApp."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Outfit:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
+    <div class="bg" aria-hidden="true"></div>
+
     <header class="nav">
       <div class="wrap nav-inner">
         <a class="brand" href="#beranda">
@@ -24,8 +26,8 @@
           <span data-store>Tetuti Kitchen</span>
         </a>
         <nav class="nav-links">
-          <a href="#menu">Menu</a>
-          <a href="#cara-pesan">Cara pesan</a>
+          <a class="nav-text" href="#menu">Produk</a>
+          <a class="nav-text" href="#cara-pesan">Cara pesan</a>
           <a class="btn btn-primary" data-wa-chat href="#">Chat WA</a>
         </nav>
       </div>
@@ -35,27 +37,27 @@
       <section class="hero" id="beranda">
         <div class="wrap hero-grid">
           <div class="hero-copy">
-            <p class="kicker">Dapur rumahan</p>
-            <h1>Tetuti <em>Kitchen</em></h1>
+            <p class="kicker">by Tetuti Kitchen</p>
+            <p class="script">Homemade, bikin nagih</p>
+            <h1>Sambal, Hantaran, <em>& Nasi Kotak</em></h1>
             <p class="lead" data-tagline>
-              Masakan rumahan, rasa istimewa. Pilih menu, klik Pesan, langsung
-              lanjut ke WhatsApp.
+              100% Homemade. Pedas nampol, renyahnya bikin nagih.
             </p>
             <div class="hero-actions">
-              <a class="btn btn-dark" href="#menu">Lihat menu</a>
-              <a class="btn btn-ghost" data-wa-chat href="#">Tanya ketersediaan</a>
+              <a class="btn btn-dark" href="#menu">Lihat produk</a>
+              <a class="btn btn-ghost" data-wa-chat href="#">Tanya harga</a>
             </div>
-            <div class="meta-row">
-              <span data-hours>Setiap hari, 10.00 – 20.00 WIB</span>
-              <span data-area>Antar sekitar area kota / bisa pickup</span>
+            <div class="pills">
+              <span>Gurih</span>
+              <span>Pedas</span>
+              <span>Renyah</span>
+              <span>100% Homemade</span>
             </div>
           </div>
-          <div class="hero-photo">
-            <img
-              src="assets/hero.jpg"
-              alt="Hidangan Tetuti Kitchen"
-            />
-            <div class="hero-chip">Pesan cepat lewat WhatsApp</div>
+          <div class="hero-stack">
+            <img src="assets/sambal-crispy.jpg" alt="Sambal Crispy Tetuti Kitchen" />
+            <img src="assets/paket-hantaran.jpg" alt="Paket Hantaran Tetuti Kitchen" />
+            <img src="assets/nasi-kotak.jpg" alt="Nasi Kotak Tetuti Kitchen" />
           </div>
         </div>
       </section>
@@ -64,17 +66,10 @@
         <div class="wrap">
           <div class="section-head">
             <div>
-              <h2>Menu hari ini</h2>
-              <p>Pilih porsi, lalu klik Pesan. Chat WA akan terisi otomatis.</p>
+              <p class="script">Menu andalan</p>
+              <h2>Tiga produk siap pesan</h2>
+              <p>Pilih jumlah, klik Pesan, langsung lanjut ke WhatsApp.</p>
             </div>
-          </div>
-          <div class="filters">
-            <button class="filter active" data-filter="semua">Semua</button>
-            <button class="filter" data-filter="paket">Paket nasi</button>
-            <button class="filter" data-filter="nasi">Nasi</button>
-            <button class="filter" data-filter="lauk">Lauk</button>
-            <button class="filter" data-filter="sayur">Sayur</button>
-            <button class="filter" data-filter="minuman">Minuman</button>
           </div>
           <div class="grid" id="product-grid"></div>
         </div>
@@ -84,25 +79,26 @@
         <div class="wrap">
           <div class="section-head">
             <div>
+              <p class="script">Gampang banget</p>
               <h2>Cara pesan</h2>
-              <p>Tanpa akun. Konfirmasi stok, alamat, dan pembayaran di WhatsApp.</p>
+              <p>Stok, harga, dan pengiriman dikonfirmasi di WhatsApp.</p>
             </div>
           </div>
           <div class="steps">
             <article class="step">
               <span>1</span>
-              <h3 class="serif">Pilih menu</h3>
-              <p>Atur jumlah porsi di kartu makanan.</p>
+              <h3>Pilih produk</h3>
+              <p>Sambal Crispy, Paket Hantaran, atau Nasi Kotak.</p>
             </article>
             <article class="step">
               <span>2</span>
-              <h3 class="serif">Klik Pesan</h3>
-              <p>WhatsApp terbuka dengan daftar pesanan yang sudah terisi.</p>
+              <h3>Klik Pesan</h3>
+              <p>Chat WA terbuka dengan pesanan yang sudah terisi.</p>
             </article>
             <article class="step">
               <span>3</span>
-              <h3 class="serif">Konfirmasi</h3>
-              <p>Kami balas ketersediaan, ongkir, dan waktu siap.</p>
+              <h3>Konfirmasi</h3>
+              <p>Kami infokan harga, ketersediaan, dan waktu siap.</p>
             </article>
           </div>
         </div>
@@ -112,7 +108,7 @@
     <footer class="footer">
       <div class="wrap footer-inner">
         <p><strong data-store>Tetuti Kitchen</strong> · <span data-phone></span></p>
-        <p>Masakan rumahan siap antar</p>
+        <p>100% homemade · Gurih · Pedas · Renyah</p>
       </div>
     </footer>
 
