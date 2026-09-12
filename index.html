@@ -15,6 +15,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/styles.css" />
+    <script>
+      document.documentElement.classList.add("js-motion");
+      window.setTimeout(function () {
+        document.documentElement.classList.remove("js-motion");
+      }, 3500);
+    </script>
   </head>
   <body>
     <div class="bg" aria-hidden="true"></div>
@@ -55,9 +61,15 @@
             </div>
           </div>
           <div class="hero-stack">
-            <img src="assets/sambal-crispy.jpg" alt="Sambal Crispy Tetuti Kitchen" />
-            <img src="assets/paket-hantaran.jpg" alt="Paket Hantaran Tetuti Kitchen" />
-            <img src="assets/nasi-kotak.jpg" alt="Nasi Kotak Tetuti Kitchen" />
+            <figure class="hero-shot shot-1">
+              <img src="assets/sambal-crispy.jpg" alt="Sambal Crispy Tetuti Kitchen" />
+            </figure>
+            <figure class="hero-shot shot-2">
+              <img src="assets/paket-hantaran.jpg" alt="Paket Hantaran Tetuti Kitchen" />
+            </figure>
+            <figure class="hero-shot shot-3">
+              <img src="assets/nasi-kotak.jpg" alt="Nasi Kotak Tetuti Kitchen" />
+            </figure>
           </div>
         </div>
       </section>
@@ -123,5 +135,6 @@
     <script src="js/config.js"></script>
     <script src="js/products.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/motion.js"></script>
   </body>
 </html>
