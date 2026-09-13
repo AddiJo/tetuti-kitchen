@@ -237,27 +237,26 @@ button {
 }
 
 .hero {
-  padding: 8px 16px 8px;
+  padding: 24px 16px 8px;
   min-height: min(70vh, 620px);
   display: grid;
   place-items: center;
 }
 
-.intro-video-wrap {
-  width: min(420px, calc(100% - 32px));
-  margin: 16px auto 8px;
-  border-radius: 24px;
+.video-frame {
+  width: min(420px, 100%);
+  margin-inline: auto;
+  border-radius: var(--radius);
   overflow: hidden;
   background: #1a0c0a;
   box-shadow: var(--shadow);
-  border: 4px solid rgba(255, 250, 244, 0.9);
 }
 
 .intro-video {
   display: block;
   width: 100%;
   aspect-ratio: 9 / 16;
-  max-height: min(68vh, 620px);
+  max-height: min(70vh, 640px);
   object-fit: cover;
   background: #1a0c0a;
 }
@@ -655,17 +654,11 @@ body.has-checkout #product-grid .card:last-child {
 
   .hero {
     min-height: min(62vh, 480px);
-    padding: 8px 8px 0;
-  }
-
-  .intro-video-wrap {
-    width: min(360px, 94vw);
-    margin-top: 10px;
-    border-width: 3px;
+    padding: 12px 8px 0;
   }
 
   .intro-video {
-    max-height: min(62vh, 520px);
+    max-height: min(64vh, 540px);
   }
 
   .hero-stack {
@@ -759,6 +752,8 @@ body.has-checkout #product-grid .card:last-child {
 
 .js-motion #menu .section-head,
 .js-motion #product-grid .card,
+.js-motion #cuplikan .section-head,
+.js-motion #cuplikan .video-frame,
 .js-motion #cara-pesan .section-head,
 .js-motion #cara-pesan .step {
   opacity: 0;
@@ -772,6 +767,8 @@ body.has-checkout #product-grid .card:last-child {
 
   .js-motion #menu .section-head,
   .js-motion #product-grid .card,
+  .js-motion #cuplikan .section-head,
+  .js-motion #cuplikan .video-frame,
   .js-motion #cara-pesan .section-head,
   .js-motion #cara-pesan .step {
     opacity: 1;

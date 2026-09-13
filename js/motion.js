@@ -66,6 +66,23 @@ function play() {
   );
 
   inView(
+    "#cuplikan",
+    () => {
+      animate(
+        "#cuplikan .section-head",
+        { y: [24, 0], opacity: [0, 1] },
+        { duration: 0.55, ease: easeOut }
+      );
+      animate(
+        "#cuplikan .video-frame",
+        { y: [32, 0], opacity: [0, 1] },
+        { duration: 0.65, ease: easeOut }
+      );
+    },
+    { margin: "0px 0px -80px 0px" }
+  );
+
+  inView(
     "#cara-pesan",
     () => {
       animate(
