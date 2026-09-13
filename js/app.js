@@ -141,6 +141,14 @@ function hydrateBrand() {
   });
 }
 
+function pauseIntroIfReducedMotion() {
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll(".intro-video").forEach((video) => {
+    video.removeAttribute("autoplay");
+    video.pause();
+  });
+}
+
 function updateDock() {
   const dock = document.querySelector(".wa-dock");
   const navChat = document.querySelector(".nav-chat");
@@ -207,6 +215,7 @@ function bindNavSpy() {
 }
 
 hydrateBrand();
+pauseIntroIfReducedMotion();
 renderProducts();
 bindGrid();
 bindWaDock();

@@ -237,10 +237,29 @@ button {
 }
 
 .hero {
-  padding: 24px 16px 8px;
+  padding: 8px 16px 8px;
   min-height: min(70vh, 620px);
   display: grid;
   place-items: center;
+}
+
+.intro-video-wrap {
+  width: min(420px, calc(100% - 32px));
+  margin: 16px auto 8px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #1a0c0a;
+  box-shadow: var(--shadow);
+  border: 4px solid rgba(255, 250, 244, 0.9);
+}
+
+.intro-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: min(68vh, 620px);
+  object-fit: cover;
+  background: #1a0c0a;
 }
 
 .kicker {
@@ -636,7 +655,17 @@ body.has-checkout #product-grid .card:last-child {
 
   .hero {
     min-height: min(62vh, 480px);
-    padding: 12px 8px 0;
+    padding: 8px 8px 0;
+  }
+
+  .intro-video-wrap {
+    width: min(360px, 94vw);
+    margin-top: 10px;
+    border-width: 3px;
+  }
+
+  .intro-video {
+    max-height: min(62vh, 520px);
   }
 
   .hero-stack {
