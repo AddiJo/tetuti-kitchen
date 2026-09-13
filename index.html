@@ -66,7 +66,7 @@
             <div>
               <p class="kicker">Menu andalan</p>
               <h2>Tiga produk siap pesan</h2>
-              <p>Pilih jumlah, klik Pesan, langsung lanjut ke WhatsApp.</p>
+              <p>Atur jumlah tiap produk. Pesan satu kartu, atau Checkout untuk beberapa sekaligus.</p>
             </div>
           </div>
           <div class="grid" id="product-grid"></div>
@@ -86,12 +86,12 @@
             <article class="step">
               <span>1</span>
               <h3>Pilih produk</h3>
-              <p>Sambal Crispy, Paket Hantaran, atau Nasi Kotak.</p>
+              <p>Sambal Crispy, Paket Hantaran, dan/atau Nasi Kotak — bisa sekaligus.</p>
             </article>
             <article class="step">
               <span>2</span>
               <h3>Klik Pesan</h3>
-              <p>Chat WA terbuka dengan pesanan yang sudah terisi.</p>
+              <p>Klik Pesan di satu kartu, atau Pesan semua kalau mau beberapa produk.</p>
             </article>
             <article class="step">
               <span>3</span>
@@ -109,6 +109,13 @@
         <p>100% homemade · Gurih · Pedas · Renyah</p>
       </div>
     </footer>
+
+    <div class="checkout" hidden>
+      <div class="wrap checkout-inner">
+        <p class="checkout-summary" aria-live="polite"></p>
+        <a class="btn btn-primary checkout-btn" data-checkout href="#">Pesan semua</a>
+      </div>
+    </div>
 
     <a class="wa-dock" data-wa-chat href="#" aria-hidden="true" tabindex="-1">
       <span class="wa-dock-icon" aria-hidden="true">

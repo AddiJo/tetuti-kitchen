@@ -1,16 +1,25 @@
 const qtyState = {};
+let heroInView = true;
 
 function waLink(text) {
   const phone = window.TETUTI.whatsappNumber.replace(/\D/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
-function orderMessage(product, qty) {
+function cartLines() {
+  return window.TETUTI_PRODUCTS.map((product) => ({
+    product,
+    qty: qtyState[product.id] || 0,
+  })).filter((line) => line.qty > 0);
+}
+
+function orderMessage(lines) {
+  const items = lines.map((line) => `• ${line.qty}x ${line.product.name}`);
   return [
     `Halo ${window.TETUTI.storeName}`,
     "",
     "Saya ingin pesan:",
-    `• ${qty}x ${product.name}`,
+    ...items,
     "",
     "Mohon info harga, ketersediaan, dan ongkirnya. Terima kasih.",
   ].join("\n");
@@ -19,7 +28,7 @@ function orderMessage(product, qty) {
 function renderProducts() {
   const root = document.getElementById("product-grid");
   root.innerHTML = window.TETUTI_PRODUCTS.map((item, index) => {
-    const qty = qtyState[item.id] || 1;
+    const qty = qtyState[item.id] || 0;
     const points = (item.highlights || [])
       .map((line) => `<li>${line}</li>`)
       .join("");
@@ -37,7 +46,7 @@ function renderProducts() {
           <div class="price">Harga via WhatsApp</div>
           <div class="card-actions">
             <div class="qty">
-              <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi">−</button>
+              <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi" ${qty === 0 ? "disabled" : ""}>−</button>
               <span id="qty-${item.id}">${qty}</span>
               <button type="button" data-qty="${item.id}" data-delta="1" aria-label="Tambah">+</button>
             </div>
@@ -49,6 +58,39 @@ function renderProducts() {
   }).join("");
 }
 
+function syncCheckout() {
+  const lines = cartLines();
+  const bar = document.querySelector(".checkout");
+  const summary = document.querySelector(".checkout-summary");
+  const button = document.querySelector("[data-checkout]");
+  const hasCart = lines.length > 0;
+
+  if (bar) {
+    bar.hidden = !hasCart;
+    bar.classList.toggle("is-visible", hasCart);
+  }
+
+  if (summary) {
+    summary.textContent = hasCart
+      ? lines.map((line) => `${line.qty}× ${line.product.name}`).join(" · ")
+      : "";
+  }
+
+  if (button) {
+    if (hasCart) {
+      button.setAttribute("href", waLink(orderMessage(lines)));
+      button.setAttribute("target", "_blank");
+      button.setAttribute("rel", "noopener");
+    } else {
+      button.setAttribute("href", "#");
+      button.removeAttribute("target");
+    }
+  }
+
+  document.body.classList.toggle("has-checkout", hasCart);
+  updateDock();
+}
+
 function bindGrid() {
   document.getElementById("product-grid").addEventListener("click", (event) => {
     const qtyBtn = event.target.closest("[data-qty]");
@@ -56,16 +98,19 @@ function bindGrid() {
 
     if (qtyBtn) {
       const id = qtyBtn.dataset.qty;
-      const next = Math.max(1, (qtyState[id] || 1) + Number(qtyBtn.dataset.delta));
+      const next = Math.max(0, (qtyState[id] || 0) + Number(qtyBtn.dataset.delta));
       qtyState[id] = next;
       const label = document.getElementById(`qty-${id}`);
       if (label) label.textContent = String(next);
+      const minus = qtyBtn.parentElement?.querySelector("[data-delta='-1']");
+      if (minus) minus.disabled = next === 0;
+      syncCheckout();
     }
 
     if (orderBtn) {
       const product = window.TETUTI_PRODUCTS.find((item) => item.id === orderBtn.dataset.order);
       const qty = qtyState[product.id] || 1;
-      window.open(waLink(orderMessage(product, qty)), "_blank", "noopener");
+      window.open(waLink(orderMessage([{ product, qty }])), "_blank", "noopener");
     }
   });
 }
@@ -96,25 +141,31 @@ function hydrateBrand() {
   });
 }
 
-function bindWaDock() {
+function updateDock() {
   const dock = document.querySelector(".wa-dock");
   const navChat = document.querySelector(".nav-chat");
-  const hero = document.getElementById("beranda");
-  if (!dock || !hero) return;
+  if (!dock) return;
 
-  const setVisible = (showDock) => {
-    dock.classList.toggle("is-visible", showDock);
-    dock.setAttribute("aria-hidden", showDock ? "false" : "true");
-    dock.tabIndex = showDock ? 0 : -1;
-    if (navChat) {
-      navChat.classList.toggle("is-hidden", showDock);
-      navChat.setAttribute("aria-hidden", showDock ? "true" : "false");
-      navChat.tabIndex = showDock ? -1 : 0;
-    }
-  };
+  const showDock = !heroInView && cartLines().length === 0;
+  dock.classList.toggle("is-visible", showDock);
+  dock.setAttribute("aria-hidden", showDock ? "false" : "true");
+  dock.tabIndex = showDock ? 0 : -1;
+  if (navChat) {
+    navChat.classList.toggle("is-hidden", showDock);
+    navChat.setAttribute("aria-hidden", showDock ? "true" : "false");
+    navChat.tabIndex = showDock ? -1 : 0;
+  }
+}
+
+function bindWaDock() {
+  const hero = document.getElementById("beranda");
+  if (!hero) return;
 
   const observer = new IntersectionObserver(
-    ([entry]) => setVisible(!entry.isIntersecting),
+    ([entry]) => {
+      heroInView = entry.isIntersecting;
+      updateDock();
+    },
     { threshold: 0.18 }
   );
   observer.observe(hero);
@@ -160,3 +211,4 @@ renderProducts();
 bindGrid();
 bindWaDock();
 bindNavSpy();
+syncCheckout();
