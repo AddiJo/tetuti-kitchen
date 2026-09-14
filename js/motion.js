@@ -10,14 +10,16 @@ function cycleHeroShots() {
   const layoutsFor = () =>
     window.matchMedia("(max-width: 620px)").matches
       ? [
-          { x: "-82%", y: 28, scale: 0.86, rotate: -9, zIndex: 2 },
-          { x: "-18%", y: 16, scale: 0.84, rotate: 9, zIndex: 1 },
-          { x: "-50%", y: 40, scale: 1, rotate: 1, zIndex: 3 },
+          { x: "-50%", y: 4, scale: 0.92, rotate: -3, zIndex: 1 },
+          { x: "-86%", y: 26, scale: 0.86, rotate: -10, zIndex: 3 },
+          { x: "-14%", y: 26, scale: 0.86, rotate: 10, zIndex: 2 },
+          { x: "-50%", y: 52, scale: 1, rotate: 1, zIndex: 4 },
         ]
       : [
-          { x: "-88%", y: 48, scale: 0.86, rotate: -10, zIndex: 2 },
-          { x: "-8%", y: 28, scale: 0.84, rotate: 10, zIndex: 1 },
-          { x: "-50%", y: 56, scale: 1, rotate: 1, zIndex: 3 },
+          { x: "-50%", y: 10, scale: 0.92, rotate: -3, zIndex: 1 },
+          { x: "-92%", y: 44, scale: 0.86, rotate: -12, zIndex: 3 },
+          { x: "-8%", y: 44, scale: 0.86, rotate: 12, zIndex: 2 },
+          { x: "-50%", y: 70, scale: 1, rotate: 1, zIndex: 4 },
         ];
 
   let offset = 0;

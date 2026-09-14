@@ -28,6 +28,7 @@ body {
   background: #140908;
   line-height: 1.55;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .bg {
@@ -302,22 +303,29 @@ h2 {
 }
 
 .shot-1 {
-  z-index: 2;
-  translate: -88% 48px;
-  scale: 0.86;
-  rotate: -10deg;
+  z-index: 1;
+  translate: -50% 10px;
+  scale: 0.92;
+  rotate: -3deg;
 }
 
 .shot-2 {
-  z-index: 1;
-  translate: -8% 28px;
-  scale: 0.84;
-  rotate: 10deg;
+  z-index: 3;
+  translate: -92% 44px;
+  scale: 0.86;
+  rotate: -12deg;
 }
 
 .shot-3 {
-  z-index: 3;
-  translate: -50% 56px;
+  z-index: 2;
+  translate: -8% 44px;
+  scale: 0.86;
+  rotate: 12deg;
+}
+
+.shot-4 {
+  z-index: 4;
+  translate: -50% 70px;
   scale: 1;
   rotate: 1deg;
 }
@@ -671,19 +679,25 @@ body.has-checkout #product-grid .card:last-child {
   }
 
   .shot-1 {
-    translate: -82% 28px;
-    scale: 0.86;
-    rotate: -9deg;
+    translate: -50% 4px;
+    scale: 0.92;
+    rotate: -3deg;
   }
 
   .shot-2 {
-    translate: -18% 16px;
-    scale: 0.84;
-    rotate: 9deg;
+    translate: -86% 26px;
+    scale: 0.86;
+    rotate: -10deg;
   }
 
   .shot-3 {
-    translate: -50% 40px;
+    translate: -14% 26px;
+    scale: 0.86;
+    rotate: 10deg;
+  }
+
+  .shot-4 {
+    translate: -50% 52px;
     scale: 1;
     rotate: 1deg;
   }
