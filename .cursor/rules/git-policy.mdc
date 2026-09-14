@@ -1,0 +1,11 @@
+---
+description: Kebijakan git untuk repo ini — commit lokal boleh, push tidak pernah
+alwaysApply: true
+---
+
+# Kebijakan Git
+
+- Boleh menjalankan `git add` dan `git commit` untuk menyimpan perubahan secara lokal.
+- **Jangan pernah** menjalankan `git push` (termasuk `git push --force`, `git push --tags`, atau push lewat `gh`). Push dilakukan sendiri oleh pemilik repo.
+- Jangan juga menjalankan perintah yang mengubah remote atau membuat PR (`git remote set-url`, `gh pr create`) tanpa diminta secara eksplisit.
+- Setelah commit, cukup laporkan hash commit dan ringkasan perubahannya, lalu biarkan pemilik repo yang mendorong ke GitHub.
