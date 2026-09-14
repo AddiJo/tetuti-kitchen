@@ -53,23 +53,25 @@ function cycleHeroShots() {
       if (el !== leaving) settle(el, depthOf(i), 0.5);
     });
 
-    // Kartu lama meluncur keluar ke kiri...
+    // Kartu lama meluncur lurus ke kiri...
     await animate(
       leaving,
-      { x: "-130%", rotate: -4, opacity: 0 },
+      { x: "-130%", opacity: 0 },
       { duration: 0.4, ease: [0.4, 0, 1, 1] }
     ).finished;
 
-    // ...lalu masuk lagi dari kanan sebagai kartu paling belakang.
+    // ...lalu masuk lurus dari kanan sebagai kartu paling belakang.
+    // y dan scale dipatok jadi dua keyframe sama supaya jalurnya tetap horizontal
+    // (dipindahkan saat kartu masih di luar layar dan transparan).
     const back = slotFor(total - 1);
     leaving.style.zIndex = String(back.zIndex);
     await animate(
       leaving,
       {
         x: ["120%", 0],
-        y: back.y,
-        scale: back.scale,
-        rotate: 0,
+        y: [back.y, back.y],
+        scale: [back.scale, back.scale],
+        rotate: [0, 0],
         opacity: [0, 1],
       },
       { duration: 0.55, ease: easeOut }
