@@ -7,37 +7,43 @@ function cycleHeroShots() {
   const shots = [...document.querySelectorAll(".hero-shot")];
   if (shots.length < 2) return;
 
-  const layoutsFor = () =>
-    window.matchMedia("(max-width: 620px)").matches
-      ? [
-          { x: "-50%", y: 4, scale: 0.92, rotate: -3, zIndex: 1 },
-          { x: "-86%", y: 26, scale: 0.86, rotate: -10, zIndex: 3 },
-          { x: "-14%", y: 26, scale: 0.86, rotate: 10, zIndex: 2 },
-          { x: "-50%", y: 52, scale: 1, rotate: 1, zIndex: 4 },
-        ]
-      : [
-          { x: "-50%", y: 10, scale: 0.92, rotate: -3, zIndex: 1 },
-          { x: "-92%", y: 44, scale: 0.86, rotate: -12, zIndex: 3 },
-          { x: "-8%", y: 44, scale: 0.86, rotate: 12, zIndex: 2 },
-          { x: "-50%", y: 70, scale: 1, rotate: 1, zIndex: 4 },
-        ];
+  const compact = window.matchMedia("(max-width: 620px)");
+
+  // Tumpukan kartu: depth 0 = kartu paling depan, sisanya mengintip di bawahnya.
+  const slotFor = (depth) => {
+    const small = compact.matches;
+    const baseY = small ? 6 : 14;
+    const step = small ? 18 : 30;
+    const scaleStep = small ? 0.05 : 0.06;
+    const tilt = Math.min(1.6 * depth, 5) * (depth % 2 ? 1 : -1);
+
+    return {
+      y: baseY + depth * step,
+      scale: Math.max(1 - depth * scaleStep, 0.6),
+      rotate: depth === 0 ? 0 : tilt,
+      zIndex: shots.length - depth,
+    };
+  };
 
   let offset = 0;
 
   const layout = () => {
-    const layouts = layoutsFor();
     shots.forEach((el, i) => {
-      const slot = layouts[(i + offset) % layouts.length];
+      const depth = (i + offset) % shots.length;
+      const slot = slotFor(depth);
       el.style.zIndex = String(slot.zIndex);
-      el.style.translate = `${slot.x} ${slot.y}px`;
+      el.style.translate = `-50% ${slot.y}px`;
       el.style.scale = String(slot.scale);
       el.style.rotate = `${slot.rotate}deg`;
     });
   };
 
+  layout();
+  compact.addEventListener("change", layout);
+
   window.setInterval(() => {
     if (document.hidden) return;
-    offset = (offset + 1) % shots.length;
+    offset = (offset + shots.length - 1) % shots.length;
     layout();
   }, 3000);
 }
