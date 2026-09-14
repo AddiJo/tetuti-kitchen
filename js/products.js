@@ -33,4 +33,14 @@ window.TETUTI_PRODUCTS = [
     highlights: ["Lauk melimpah", "Bumbu asli, gurih mantap", "Harga ramah, aman di kantong"],
     image: "assets/nasi-kotak.jpg",
   },
+  {
+    id: "sosis-solo",
+    name: "Sosis Solo",
+    category: "camilan",
+    badge: "Baru",
+    hook: "Gurih, renyah, nagih!",
+    desc: "Kulit tipis renyah dengan isian daging berbumbu. Digoreng garing, enak untuk camilan dan lauk.",
+    highlights: ["Isian daging melimpah", "Renyah di luar, lembut di dalam", "Cocok untuk acara & camilan"],
+    image: "assets/sosis-solo.jpg",
+  },
 ];
