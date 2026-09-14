@@ -8,44 +8,78 @@ function cycleHeroShots() {
   if (shots.length < 2) return;
 
   const compact = window.matchMedia("(max-width: 620px)");
+  const total = shots.length;
 
-  // Tumpukan kartu: depth 0 = kartu paling depan, sisanya mengintip di bawahnya.
+  // Tumpukan kartu lurus: depth 0 = kartu paling depan, sisanya mengintip di bawahnya.
   const slotFor = (depth) => {
     const small = compact.matches;
     const baseY = small ? 6 : 14;
     const step = small ? 18 : 30;
     const scaleStep = small ? 0.05 : 0.06;
-    const tilt = Math.min(1.6 * depth, 5) * (depth % 2 ? 1 : -1);
 
     return {
       y: baseY + depth * step,
       scale: Math.max(1 - depth * scaleStep, 0.6),
-      rotate: depth === 0 ? 0 : tilt,
-      zIndex: shots.length - depth,
+      zIndex: total - depth,
     };
   };
 
-  let offset = 0;
+  let front = 0;
+  const depthOf = (index) => (index - front + total) % total;
 
-  const layout = () => {
-    shots.forEach((el, i) => {
-      const depth = (i + offset) % shots.length;
-      const slot = slotFor(depth);
-      el.style.zIndex = String(slot.zIndex);
-      el.style.translate = `-50% ${slot.y}px`;
-      el.style.scale = String(slot.scale);
-      el.style.rotate = `${slot.rotate}deg`;
-    });
+  const settle = (el, depth, duration) => {
+    const slot = slotFor(depth);
+    el.style.zIndex = String(slot.zIndex);
+    return animate(
+      el,
+      { x: 0, y: slot.y, scale: slot.scale, rotate: 0, opacity: 1 },
+      { duration, ease: easeOut }
+    );
+  };
+
+  const layout = (duration = 0) => {
+    shots.forEach((el, i) => settle(el, depthOf(i), duration));
   };
 
   layout();
-  compact.addEventListener("change", layout);
+  compact.addEventListener("change", () => layout(0.3));
+
+  const shuffle = async () => {
+    const leaving = shots[front];
+    front = (front + 1) % total;
+
+    // Kartu di belakang naik satu tingkat.
+    shots.forEach((el, i) => {
+      if (el !== leaving) settle(el, depthOf(i), 0.5);
+    });
+
+    // Kartu lama meluncur keluar ke kiri...
+    await animate(
+      leaving,
+      { x: "-130%", rotate: -4, opacity: 0 },
+      { duration: 0.4, ease: [0.4, 0, 1, 1] }
+    ).finished;
+
+    // ...lalu masuk lagi dari kanan sebagai kartu paling belakang.
+    const back = slotFor(total - 1);
+    leaving.style.zIndex = String(back.zIndex);
+    await animate(
+      leaving,
+      {
+        x: ["120%", 0],
+        y: back.y,
+        scale: back.scale,
+        rotate: 0,
+        opacity: [0, 1],
+      },
+      { duration: 0.55, ease: easeOut }
+    ).finished;
+  };
 
   window.setInterval(() => {
     if (document.hidden) return;
-    offset = (offset + shots.length - 1) % shots.length;
-    layout();
-  }, 3000);
+    shuffle();
+  }, 3400);
 }
 
 function play() {

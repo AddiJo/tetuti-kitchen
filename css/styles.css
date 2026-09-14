@@ -294,40 +294,28 @@ h2 {
   left: 50%;
   top: 0;
   width: 70%;
-  margin: 0;
-  will-change: translate, scale, rotate;
-  transition:
-    translate 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    scale 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    rotate 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  margin: 0 0 0 -35%;
+  will-change: transform, opacity;
 }
 
 .shot-1 {
   z-index: 4;
-  translate: -50% 14px;
-  scale: 1;
-  rotate: 0deg;
+  transform: translateY(14px) scale(1);
 }
 
 .shot-2 {
   z-index: 3;
-  translate: -50% 44px;
-  scale: 0.94;
-  rotate: 1.6deg;
+  transform: translateY(44px) scale(0.94);
 }
 
 .shot-3 {
   z-index: 2;
-  translate: -50% 74px;
-  scale: 0.88;
-  rotate: -3.2deg;
+  transform: translateY(74px) scale(0.88);
 }
 
 .shot-4 {
   z-index: 1;
-  translate: -50% 104px;
-  scale: 0.82;
-  rotate: 4.8deg;
+  transform: translateY(104px) scale(0.82);
 }
 
 .hero-shot img {
@@ -676,30 +664,23 @@ body.has-checkout #product-grid .card:last-child {
 
   .hero-shot {
     width: 82%;
+    margin-left: -41%;
   }
 
   .shot-1 {
-    translate: -50% 6px;
-    scale: 1;
-    rotate: 0deg;
+    transform: translateY(6px) scale(1);
   }
 
   .shot-2 {
-    translate: -50% 24px;
-    scale: 0.95;
-    rotate: 1.6deg;
+    transform: translateY(24px) scale(0.95);
   }
 
   .shot-3 {
-    translate: -50% 42px;
-    scale: 0.9;
-    rotate: -3.2deg;
+    transform: translateY(42px) scale(0.9);
   }
 
   .shot-4 {
-    translate: -50% 60px;
-    scale: 0.85;
-    rotate: 4.8deg;
+    transform: translateY(60px) scale(0.85);
   }
 
   .section {
