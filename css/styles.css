@@ -238,19 +238,45 @@ button {
 }
 
 .hero {
-  padding: 24px 16px 8px;
-  min-height: min(70vh, 620px);
-  display: grid;
-  place-items: center;
+  padding: 20px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
 }
 
-/* Kolom kiri lebih sempit karena isinya video portrait, kanan untuk landscape,
-   supaya tinggi keduanya tidak terlalu jauh berbeda. */
+.hero-reel {
+  width: min(680px, 100%);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #1a0c0a;
+  box-shadow: var(--shadow);
+}
+
+.reel-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #1a0c0a;
+}
+
+/* Tiap video memakai rasio aslinya, jadi lebar bingkainya dibedakan
+   per orientasi supaya tingginya tetap wajar. */
 .video-grid {
-  display: grid;
-  grid-template-columns: 28fr 70fr;
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
   gap: 18px;
+}
+
+.frame-portrait {
+  width: min(340px, 100%);
+}
+
+.frame-landscape {
+  width: min(720px, 100%);
 }
 
 .video-frame {
@@ -665,15 +691,8 @@ body.has-checkout #product-grid .card:last-child {
     grid-template-columns: 1fr;
   }
 
-  /* Ditumpuk: video portrait dibatasi lebarnya supaya tingginya tetap wajar. */
-  .video-grid {
-    grid-template-columns: 1fr;
-    max-width: 560px;
-  }
-
   .frame-portrait {
-    max-width: min(340px, 36vh);
-    margin-inline: auto;
+    width: min(340px, 36vh);
   }
 }
 
@@ -683,12 +702,12 @@ body.has-checkout #product-grid .card:last-child {
   }
 
   .hero {
-    min-height: min(62vh, 480px);
     padding: 12px 8px 0;
+    gap: 14px;
   }
 
   .frame-portrait {
-    max-width: min(320px, 34vh);
+    width: min(320px, 34vh);
   }
 
   .hero-stack {
