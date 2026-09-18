@@ -238,36 +238,18 @@ button {
 }
 
 .hero {
-  padding: 20px 16px 8px;
+  padding: 24px 16px 8px;
+  min-height: min(70vh, 620px);
+  display: grid;
+  place-items: center;
+}
+
+/* Video ditumpuk vertikal dan dipusatkan. Tiap video memakai rasio aslinya,
+   jadi lebar bingkainya dibedakan per orientasi. */
+.video-grid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-}
-
-.hero-reel {
-  width: min(680px, 100%);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: #1a0c0a;
-  box-shadow: var(--shadow);
-}
-
-.reel-video {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  background: #1a0c0a;
-}
-
-/* Tiap video memakai rasio aslinya, jadi lebar bingkainya dibedakan
-   per orientasi supaya tingginya tetap wajar. */
-.video-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
   gap: 18px;
 }
 
@@ -702,8 +684,8 @@ body.has-checkout #product-grid .card:last-child {
   }
 
   .hero {
+    min-height: min(62vh, 480px);
     padding: 12px 8px 0;
-    gap: 14px;
   }
 
   .frame-portrait {
