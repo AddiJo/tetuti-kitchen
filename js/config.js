@@ -1,4 +1,5 @@
 window.TETUTI = {
+  siteUrl: "https://www.tetuti.my.id",
   storeName: "Tetuti Kitchen",
   tagline: "100% Homemade. Pedas nampol, renyahnya bikin nagih.",
   city: "Jakarta",

@@ -117,7 +117,6 @@ function bindGrid() {
 
 function hydrateBrand() {
   const { storeName, tagline, hours, area, whatsappNumber } = window.TETUTI;
-  document.title = `${storeName} — Homemade`;
   document.querySelectorAll("[data-store]").forEach((el) => {
     el.textContent = storeName;
   });
@@ -139,6 +138,55 @@ function hydrateBrand() {
   document.querySelectorAll("[data-phone]").forEach((el) => {
     el.textContent = whatsappNumber.replace(/^62/, "0");
   });
+}
+
+// Data terstruktur untuk Google, dibangun dari config + daftar produk supaya
+// tidak perlu diperbarui manual setiap ada produk baru.
+function injectStructuredData() {
+  const { siteUrl, storeName, tagline, city, whatsappNumber } = window.TETUTI;
+  const absolute = (path) => `${siteUrl}/${path.replace(/^\//, "")}`;
+  const phone = whatsappNumber.replace(/\D/g, "");
+
+  const data = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "FoodEstablishment",
+        "@id": `${siteUrl}/#business`,
+        name: storeName,
+        description: tagline,
+        url: `${siteUrl}/`,
+        image: absolute("assets/og-image.jpg"),
+        logo: absolute("assets/logo-cabai.svg"),
+        telephone: `+${phone}`,
+        servesCuisine: "Indonesian",
+        areaServed: city,
+        availableLanguage: "id",
+        sameAs: [`https://wa.me/${phone}`],
+      },
+      {
+        "@type": "ItemList",
+        name: `Menu ${storeName}`,
+        itemListElement: window.TETUTI_PRODUCTS.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          item: {
+            "@type": "Product",
+            name: item.name,
+            description: item.desc,
+            image: absolute(item.image),
+            category: item.category,
+            brand: { "@type": "Brand", name: storeName },
+          },
+        })),
+      },
+    ],
+  };
+
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.textContent = JSON.stringify(data);
+  document.head.appendChild(script);
 }
 
 function pauseIntroIfReducedMotion() {
@@ -215,6 +263,7 @@ function bindNavSpy() {
 }
 
 hydrateBrand();
+injectStructuredData();
 pauseIntroIfReducedMotion();
 renderProducts();
 bindGrid();
