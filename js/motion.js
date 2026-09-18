@@ -120,7 +120,7 @@ function play() {
       animate(
         "#cuplikan .video-frame",
         { y: [32, 0], opacity: [0, 1] },
-        { duration: 0.65, ease: easeOut }
+        { delay: stagger(0.12), duration: 0.65, ease: easeOut }
       );
     },
     { margin: "0px 0px -80px 0px" }
