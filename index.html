@@ -119,33 +119,37 @@
             </div>
           </div>
           <div class="video-grid">
-            <figure class="video-frame frame-portrait">
-              <video
-                class="intro-video video-portrait"
-                autoplay
-                muted
-                loop
-                playsinline
-                preload="metadata"
-                aria-label="Video Sambal Crispy Tetuti Kitchen"
-              >
-                <source src="assets/video.mp4" type="video/mp4" />
-              </video>
-              <figcaption>Sambal Crispy</figcaption>
-            </figure>
-            <figure class="video-frame frame-landscape">
-              <video
-                class="intro-video video-landscape"
-                autoplay
-                muted
-                loop
-                playsinline
-                preload="metadata"
-                aria-label="Video Sosis Solo Tetuti Kitchen"
-              >
-                <source src="assets/sosis-solo.mp4" type="video/mp4" />
-              </video>
-              <figcaption>Sosis Solo</figcaption>
+            <figure class="video-frame video-reel" data-reel>
+              <div class="reel-stage">
+                <video
+                  class="intro-video reel-video"
+                  data-reel-video
+                  muted
+                  playsinline
+                  preload="auto"
+                  aria-label="Cuplikan dapur Tetuti Kitchen"
+                ></video>
+                <button class="reel-sound" type="button" data-reel-sound aria-pressed="false">
+                  <span class="reel-sound-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path class="icon-speaker" d="M4 9.2h3.1L11 5.4v13.2L7.1 14.8H4z" />
+                      <path
+                        class="icon-off"
+                        d="m14.4 9.6 1.3-1.3 1.8 1.8 1.8-1.8 1.3 1.3-1.8 1.8 1.8 1.8-1.3 1.3-1.8-1.8-1.8 1.8-1.3-1.3 1.8-1.8z"
+                      />
+                      <path
+                        class="icon-on"
+                        d="M14.8 8.6a4.8 4.8 0 0 1 0 6.8l1.3 1.3a6.6 6.6 0 0 0 0-9.4zm2.6-2.6a8.4 8.4 0 0 1 0 12l1.3 1.3a10.2 10.2 0 0 0 0-14.6z"
+                      />
+                    </svg>
+                  </span>
+                  <span data-reel-sound-label>Nyalakan suara</span>
+                </button>
+              </div>
+              <figcaption>
+                <span data-reel-title>Sambal Crispy</span>
+                <span class="reel-dots" data-reel-dots></span>
+              </figcaption>
             </figure>
           </div>
         </div>
@@ -209,6 +213,7 @@
     <script src="js/config.js"></script>
     <script src="js/products.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/reel.js"></script>
     <script type="module" src="js/motion.js"></script>
   </body>
 </html>

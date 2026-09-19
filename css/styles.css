@@ -244,21 +244,11 @@ button {
   place-items: center;
 }
 
-/* Video ditumpuk vertikal dan dipusatkan. Tiap video memakai rasio aslinya,
-   jadi lebar bingkainya dibedakan per orientasi. */
+/* Semua cuplikan berbagi satu bingkai dan diputar bergantian. */
 .video-grid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-}
-
-.frame-portrait {
-  width: min(340px, 100%);
-}
-
-.frame-landscape {
-  width: min(720px, 100%);
 }
 
 .video-frame {
@@ -269,6 +259,24 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* Lebar dikunci di figure-nya, kalau tidak ukuran asli video (1280px) yang
+   jadi patokan dan bingkainya melar selebar kontainer. */
+.video-reel {
+  width: min(340px, 100%);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.video-reel.is-landscape {
+  width: min(760px, 100%);
+}
+
+.reel-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--reel-ar, 16 / 9);
+  transition: aspect-ratio 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .intro-video {
   display: block;
   width: 100%;
@@ -276,22 +284,92 @@ button {
   background: #1a0c0a;
 }
 
-.video-portrait {
-  aspect-ratio: 9 / 16;
-  max-height: min(70vh, 640px);
+.reel-video {
+  height: 100%;
+  cursor: pointer;
+  transition: opacity 0.35s ease;
 }
 
-.video-landscape {
-  aspect-ratio: 16 / 9;
+.video-reel.is-switching .reel-video {
+  opacity: 0;
+}
+
+.reel-sound {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 10px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cream);
+  background: rgba(20, 9, 8, 0.66);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.reel-sound:hover,
+.reel-sound:focus-visible {
+  background: rgba(139, 26, 26, 0.9);
+}
+
+.reel-sound-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.reel-sound .icon-on,
+.reel-sound.is-on .icon-off {
+  display: none;
+}
+
+.reel-sound.is-on .icon-on {
+  display: block;
 }
 
 .video-frame figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px 16px 12px;
   font-size: 0.85rem;
   font-weight: 600;
   color: rgba(255, 248, 240, 0.92);
   background: rgba(26, 12, 10, 0.92);
 }
+
+.reel-dots {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.reel-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 248, 240, 0.32);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.reel-dot.is-active {
+  background: var(--gold);
+  transform: scale(1.2);
+}
+
 
 .kicker {
   font-family: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -673,8 +751,8 @@ body.has-checkout #product-grid .card:last-child {
     grid-template-columns: 1fr;
   }
 
-  .frame-portrait {
-    width: min(340px, 36vh);
+  .video-reel.is-landscape {
+    width: 100%;
   }
 }
 
@@ -688,8 +766,8 @@ body.has-checkout #product-grid .card:last-child {
     padding: 12px 8px 0;
   }
 
-  .frame-portrait {
-    width: min(320px, 34vh);
+  .video-reel {
+    width: min(320px, 78vw);
   }
 
   .hero-stack {
