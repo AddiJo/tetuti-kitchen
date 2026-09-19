@@ -189,12 +189,17 @@ function injectStructuredData() {
   document.head.appendChild(script);
 }
 
-function pauseIntroIfReducedMotion() {
-  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  document.querySelectorAll(".intro-video").forEach((video) => {
-    video.removeAttribute("autoplay");
-    video.pause();
-  });
+// Hero ditarik ke belakang navbar, jadi tingginya perlu diketahui CSS.
+function syncNavHeight() {
+  const nav = document.querySelector(".nav");
+  if (!nav) return;
+
+  const apply = () => {
+    document.documentElement.style.setProperty("--nav-h", `${Math.round(nav.offsetHeight)}px`);
+  };
+
+  apply();
+  window.addEventListener("resize", apply, { passive: true });
 }
 
 function updateDock() {
@@ -213,28 +218,18 @@ function updateDock() {
   }
 }
 
-// Area pembuka sekarang dua bagian: pita video lalu dek kartu. Tombol WA
-// mengambang baru muncul setelah keduanya terlewati.
 function bindWaDock() {
-  const tops = [
-    document.querySelector(".reel-band"),
-    document.getElementById("beranda"),
-  ].filter(Boolean);
-  if (tops.length === 0) return;
+  const hero = document.getElementById("beranda");
+  if (!hero) return;
 
-  const shown = new Set();
   const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) shown.add(entry.target);
-        else shown.delete(entry.target);
-      });
-      heroInView = shown.size > 0;
+    ([entry]) => {
+      heroInView = entry.isIntersecting;
       updateDock();
     },
     { threshold: 0.18 }
   );
-  tops.forEach((el) => observer.observe(el));
+  observer.observe(hero);
 }
 
 function bindNavSpy() {
@@ -274,7 +269,7 @@ function bindNavSpy() {
 
 hydrateBrand();
 injectStructuredData();
-pauseIntroIfReducedMotion();
+syncNavHeight();
 renderProducts();
 bindGrid();
 bindWaDock();
