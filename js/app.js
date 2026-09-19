@@ -213,18 +213,28 @@ function updateDock() {
   }
 }
 
+// Area pembuka sekarang dua bagian: pita video lalu dek kartu. Tombol WA
+// mengambang baru muncul setelah keduanya terlewati.
 function bindWaDock() {
-  const hero = document.getElementById("beranda");
-  if (!hero) return;
+  const tops = [
+    document.querySelector(".reel-band"),
+    document.getElementById("beranda"),
+  ].filter(Boolean);
+  if (tops.length === 0) return;
 
+  const shown = new Set();
   const observer = new IntersectionObserver(
-    ([entry]) => {
-      heroInView = entry.isIntersecting;
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) shown.add(entry.target);
+        else shown.delete(entry.target);
+      });
+      heroInView = shown.size > 0;
       updateDock();
     },
     { threshold: 0.18 }
   );
-  observer.observe(hero);
+  tops.forEach((el) => observer.observe(el));
 }
 
 function bindNavSpy() {

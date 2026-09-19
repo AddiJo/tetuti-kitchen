@@ -238,42 +238,37 @@ button {
 }
 
 .hero {
-  padding: 24px 16px 8px;
-  min-height: min(70vh, 620px);
+  padding: 28px 16px 8px;
   display: grid;
   place-items: center;
 }
 
-/* Semua cuplikan berbagi satu bingkai dan diputar bergantian. */
-.video-grid {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* Pita pembuka: semua cuplikan berbagi satu bingkai selebar layar dan diputar
+   bergantian. */
+.reel-band {
+  width: 100%;
+  background: #1a0c0a;
 }
 
 .video-frame {
   margin: 0;
-  border-radius: var(--radius);
   overflow: hidden;
   background: #1a0c0a;
-  box-shadow: var(--shadow);
 }
 
 /* Lebar dikunci di figure-nya, kalau tidak ukuran asli video (1280px) yang
-   jadi patokan dan bingkainya melar selebar kontainer. */
+   jadi patokan lebar minimumnya. */
 .video-reel {
-  width: min(340px, 100%);
-  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.video-reel.is-landscape {
-  width: min(760px, 100%);
+  width: 100%;
 }
 
 .reel-stage {
   position: relative;
   width: 100%;
   aspect-ratio: var(--reel-ar, 16 / 9);
+  /* Disisakan ruang buat navbar dan bar judul. Di layar yang lebih lebar dari
+     rasio klip, sisi kiri-kanan jadi gelap ketimbang gambarnya terpotong. */
+  max-height: calc(100vh - 130px);
   transition: aspect-ratio 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -284,8 +279,11 @@ button {
   background: #1a0c0a;
 }
 
+/* contain, bukan cover: tulisan di klip menempel ke tepi bawah, sedikit
+   pemotongan saja langsung bikin teksnya terpenggal. */
 .reel-video {
   height: 100%;
+  object-fit: contain;
   cursor: pointer;
   transition: opacity 0.35s ease;
 }
@@ -294,10 +292,11 @@ button {
   opacity: 0;
 }
 
+/* Di bawah, bukan di atas: bagian atas video tertutup navbar yang sticky. */
 .reel-sound {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  right: 16px;
+  bottom: 16px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -392,10 +391,11 @@ h2 {
   font-size: clamp(2rem, 4vw, 3rem);
 }
 
+/* Dek kartu dikecilkan karena video pembuka sudah memakan layar atas. */
 .hero-stack {
   position: relative;
-  width: min(460px, 92vw);
-  height: min(500px, 70vh);
+  width: min(360px, 84vw);
+  height: min(400px, 52vh);
 }
 
 .hero-shot {
@@ -751,9 +751,6 @@ body.has-checkout #product-grid .card:last-child {
     grid-template-columns: 1fr;
   }
 
-  .video-reel.is-landscape {
-    width: 100%;
-  }
 }
 
 @media (max-width: 620px) {
@@ -762,17 +759,19 @@ body.has-checkout #product-grid .card:last-child {
   }
 
   .hero {
-    min-height: min(62vh, 480px);
-    padding: 12px 8px 0;
+    padding: 16px 8px 0;
   }
 
-  .video-reel {
-    width: min(320px, 78vw);
+  .reel-sound {
+    right: 10px;
+    bottom: 10px;
+    padding: 7px 12px 7px 9px;
+    font-size: 0.75rem;
   }
 
   .hero-stack {
-    width: min(360px, 94vw);
-    height: 440px;
+    width: min(300px, 82vw);
+    height: 360px;
   }
 
   .hero-shot {
@@ -860,8 +859,6 @@ body.has-checkout #product-grid .card:last-child {
 
 .js-motion #menu .section-head,
 .js-motion #product-grid .card,
-.js-motion #cuplikan .section-head,
-.js-motion #cuplikan .video-frame,
 .js-motion #cara-pesan .section-head,
 .js-motion #cara-pesan .step {
   opacity: 0;
@@ -875,8 +872,6 @@ body.has-checkout #product-grid .card:last-child {
 
   .js-motion #menu .section-head,
   .js-motion #product-grid .card,
-  .js-motion #cuplikan .section-head,
-  .js-motion #cuplikan .video-frame,
   .js-motion #cara-pesan .section-head,
   .js-motion #cara-pesan .step {
     opacity: 1;
