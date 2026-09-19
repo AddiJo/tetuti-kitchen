@@ -276,7 +276,7 @@ button {
 }
 
 .hero-content {
-  max-width: 760px;
+  max-width: 620px;
   margin-right: auto;
   color: var(--cream);
 }
@@ -291,24 +291,17 @@ button {
 }
 
 .hero h1 {
-  font-size: clamp(2.3rem, 6vw, 4.2rem);
-  line-height: 1.04;
+  font-size: clamp(2rem, 4.4vw, 3.2rem);
+  line-height: 1.06;
   color: #fff;
   text-wrap: balance;
-}
-
-.hero-lead {
-  margin-top: 18px;
-  max-width: 48ch;
-  font-size: clamp(1rem, 1.5vw, 1.15rem);
-  color: rgba(255, 248, 240, 0.86);
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 22px;
 }
 
 .hero-actions .btn-ghost {
