@@ -157,7 +157,7 @@ function injectStructuredData() {
         description: tagline,
         url: `${siteUrl}/`,
         image: absolute("assets/og-image.jpg"),
-        logo: absolute("assets/logo-cabai.svg"),
+        logo: absolute("assets/logo-cabai.png"),
         telephone: `+${phone}`,
         servesCuisine: "Indonesian",
         areaServed: city,
