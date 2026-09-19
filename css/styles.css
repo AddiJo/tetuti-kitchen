@@ -304,17 +304,6 @@ button {
   margin-top: 22px;
 }
 
-.hero-actions .btn-ghost {
-  color: var(--cream);
-  border-color: rgba(255, 248, 240, 0.42);
-  background: rgba(255, 248, 240, 0.08);
-  backdrop-filter: blur(6px);
-}
-
-.hero-actions .btn-ghost:hover {
-  background: rgba(255, 248, 240, 0.18);
-}
-
 .reel-sound {
   position: absolute;
   right: 20px;
