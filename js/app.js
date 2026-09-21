@@ -163,22 +163,28 @@ function injectStructuredData() {
         areaServed: city,
         availableLanguage: "id",
         sameAs: [`https://wa.me/${phone}`],
+        hasMenu: { "@id": `${siteUrl}/#menu` },
       },
       {
-        "@type": "ItemList",
+        // Dipakai MenuItem, bukan Product, karena Product wajib punya harga
+        // sementara harga di sini ditanyakan lewat WhatsApp.
+        "@type": "Menu",
+        "@id": `${siteUrl}/#menu`,
         name: `Menu ${storeName}`,
-        itemListElement: window.TETUTI_PRODUCTS.map((item, index) => ({
-          "@type": "ListItem",
-          position: index + 1,
-          item: {
-            "@type": "Product",
-            name: item.name,
-            description: item.desc,
-            image: absolute(item.image),
-            category: item.category,
-            brand: { "@type": "Brand", name: storeName },
-          },
-        })),
+        hasMenuSection: [...new Set(window.TETUTI_PRODUCTS.map((item) => item.category))].map(
+          (category) => ({
+            "@type": "MenuSection",
+            name: category.charAt(0).toUpperCase() + category.slice(1),
+            hasMenuItem: window.TETUTI_PRODUCTS.filter((item) => item.category === category).map(
+              (item) => ({
+                "@type": "MenuItem",
+                name: item.name,
+                description: item.desc,
+                image: absolute(item.image),
+              })
+            ),
+          })
+        ),
       },
     ],
   };
