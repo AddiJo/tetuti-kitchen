@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://www.tetuti.my.id/sitemap.xml
+Sitemap: https://www.tetuti.my.id/sitemap-1.xml
