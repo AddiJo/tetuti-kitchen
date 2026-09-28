@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sketsa layar fase 1 — Admin Tetuti</title>
+    <style>
+      :root {
+        --ink: #1d1a19;
+        --muted: #6f6763;
+        --line: #d8d1cc;
+        --fill: #f4efeb;
+        --paper: #fffdfb;
+        --brand: #6a1010;
+        --ok: #2f6b3a;
+        --warn: #8a5a00;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #ebe6e2;
+        color: var(--ink);
+        font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      h1 { margin: 0 0 4px; font-size: 20px; }
+      .lead { margin: 0 0 28px; color: var(--muted); max-width: 760px; }
+      .board { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+      .screen { width: 340px; }
+      .screen-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+      .screen-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+      .phone {
+        min-height: 640px;
+        border: 1.5px solid var(--ink);
+        border-radius: 22px;
+        background: var(--paper);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 600;
+      }
+      .bar small { font-weight: 400; color: var(--muted); }
+      .body { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+      .field { display: flex; flex-direction: column; gap: 4px; }
+      .label { font-size: 12px; color: var(--muted); }
+      .input {
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 9px 10px;
+        color: var(--muted);
+      }
+      .input.tall { height: 64px; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid var(--ink);
+        background: #fff;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+      .btn.small { height: 30px; padding: 0 10px; font-size: 12px; }
+      .btn.ghost { border-color: var(--line); color: var(--muted); }
+      .btn.full { width: 100%; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .row.between { justify-content: space-between; }
+      .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+      .chip {
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: 12px;
+        background: #fff;
+      }
+      .chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+      .order {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
+      .status {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid currentColor;
+      }
+      .s-baru { color: var(--brand); }
+      .s-konfirmasi { color: var(--warn); }
+      .s-siap { color: var(--ok); }
+      .muted { color: var(--muted); }
+      .small { font-size: 12px; }
+      .box {
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .item { display: grid; grid-template-columns: 1fr 44px 86px; gap: 6px; align-items: center; }
+      .item .input { height: 32px; padding: 6px 8px; font-size: 12px; }
+      .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+      .seg span { flex: 1; text-align: center; padding: 8px; font-size: 13px; }
+      .seg .on { background: var(--ink); color: #fff; }
+      .steps { display: flex; gap: 4px; }
+      .steps span {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--line);
+      }
+      .steps .done { background: var(--ink); }
+      .step-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+      .total { display: flex; justify-content: space-between; font-weight: 600; }
+      .foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+      .error {
+        border-left: 3px solid var(--brand);
+        padding: 6px 10px;
+        background: var(--fill);
+        font-size: 12px;
+      }
+      .fab-space { margin-top: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Sketsa layar fase 1 — Admin Tetuti</h1>
+    <p class="lead">
+      Empat layar, ukuran HP karena admin paling sering dibuka dari ponsel saat
+      membalas chat. Sketsa kasar: yang dinilai urutan isian dan tombolnya,
+      bukan warna atau huruf.
+    </p>
+
+    <div class="board">
+      <section class="screen">
+        <p class="screen-title">1. Masuk</p>
+        <div class="phone">
+          <div class="bar">Admin Tetuti Kitchen</div>
+          <div class="body">
+            <div class="field">
+              <span class="label">Email</span>
+              <div class="input">pemilik@…</div>
+            </div>
+            <div class="field">
+              <span class="label">Sandi</span>
+              <div class="input">••••••••</div>
+            </div>
+            <div class="error">Email atau sandi salah.</div>
+            <div class="btn primary full">Masuk</div>
+            <p class="small muted">
+              Tidak ada tombol daftar. Akun pemilik dibuat dari dashboard Supabase.
+            </p>
+          </div>
+        </div>
+        <p class="screen-note">
+          Pesan salah sandi selalu sama, tidak membedakan email salah atau sandi salah.
+        </p>
+      </section>
+
+      <section class="screen">
+        <p class="screen-title">2. Daftar pesanan</p>
+        <div class="phone">
+          <div class="bar">
+            Pesanan
+            <span class="btn small ghost">Keluar</span>
+          </div>
+          <div class="body">
+            <div class="input">Cari nama atau kode</div>
+            <div class="chips">
+              <span class="chip on">Aktif</span>
+              <span class="chip">Baru</span>
+              <span class="chip">Dikonfirmasi</span>
+              <span class="chip">Diproses</span>
+              <span class="chip">Siap</span>
+              <span class="chip">Selesai</span>
+              <span class="chip">Batal</span>
+            </div>
+            <div class="order">
+              <div class="row between">
+                <strong>Bu Rina</strong>
+                <span class="status s-baru">Baru</span>
+              </div>
+              <span class="small">3× Sambal Crispy</span>
+              <div class="row between">
+                <span class="code">TK-28092026-03</span>
+                <span class="small muted">Harga belum diisi</span>
+              </div>
+            </div>
+            <div class="order">
+              <div class="row between">
+                <strong>Pak Budi</strong>
+                <span class="status s-konfirmasi">Dikonfirmasi</span>
+              </div>
+              <span class="small">20× Nasi Kotak · Antar</span>
+              <div class="row between">
+                <span class="code">TK-28092026-02</span>
+                <strong class="small">Rp710.000</strong>
+              </div>
+            </div>
+            <div class="order">
+              <div class="row between">
+                <strong>Mbak Sari</strong>
+                <span class="status s-siap">Siap</span>
+              </div>
+              <span class="small">1× Paket Hantaran · Pickup 14.00</span>
+              <div class="row between">
+                <span class="code">TK-28092026-01</span>
+                <strong class="small">Rp185.000</strong>
+              </div>
+            </div>
+            <div class="btn primary full fab-space">+ Catat pesanan</div>
+          </div>
+        </div>
+        <p class="screen-note">
+          Filter “Aktif” (bawaan) menyembunyikan Selesai dan Batal. Total kosong
+          sampai semua harga item diisi.
+        </p>
+      </section>
+
+      <section class="screen">
+        <p class="screen-title">3. Catat pesanan</p>
+        <div class="phone">
+          <div class="bar">
+            Pesanan baru
+            <small>Batal</small>
+          </div>
+          <div class="body">
+            <div class="field">
+              <span class="label">Nama pembeli</span>
+              <div class="input">Bu Rina</div>
+            </div>
+            <div class="field">
+              <span class="label">WhatsApp</span>
+              <div class="input">0812 0000 0001</div>
+            </div>
+            <div class="seg"><span class="on">Pickup</span><span>Antar</span></div>
+            <div class="field">
+              <span class="label">Waktu diminta (opsional)</span>
+              <div class="input">Sab, 3 Okt · 14.00</div>
+            </div>
+            <div class="box">
+              <span class="label">Item</span>
+              <div class="item">
+                <div class="input">Sambal Crispy ▾</div>
+                <div class="input">3</div>
+                <div class="input">Harga</div>
+              </div>
+              <span class="small muted">+ Tambah item</span>
+            </div>
+            <div class="field">
+              <span class="label">Catatan</span>
+              <div class="input tall">Level pedas sedang</div>
+            </div>
+          </div>
+          <div class="foot">
+            <div class="btn primary full">Simpan sebagai Baru</div>
+          </div>
+        </div>
+        <p class="screen-note">
+          Pilih Antar memunculkan kolom alamat dan ongkir. Nomor 08… disimpan
+          sebagai 62…. Harga boleh kosong sampai konfirmasi.
+        </p>
+      </section>
+
+      <section class="screen">
+        <p class="screen-title">4. Detail dan ubah status</p>
+        <div class="phone">
+          <div class="bar">
+            <span>‹ TK-28092026-02</span>
+            <small>Ubah</small>
+          </div>
+          <div class="body">
+            <div class="steps">
+              <span class="done"></span><span class="done"></span><span></span><span></span><span></span>
+            </div>
+            <div class="step-labels">
+              <span>Baru</span><span>Konfirmasi</span><span>Proses</span><span>Siap</span><span>Selesai</span>
+            </div>
+            <div class="order">
+              <strong>Pak Budi</strong>
+              <span class="small">0812 0000 0002 · <u>Buka WhatsApp</u></span>
+              <span class="small muted">Antar · Jl. Melati 3 · Sab 3 Okt, 11.00</span>
+            </div>
+            <div class="box">
+              <div class="row between small"><span>20× Nasi Kotak</span><span>Rp35.000</span></div>
+              <div class="row between small muted"><span>Ongkir</span><span>Rp10.000</span></div>
+              <div class="total"><span>Total</span><span>Rp710.000</span></div>
+            </div>
+            <div class="order">
+              <span class="label">Catatan</span>
+              <span class="small">Tanpa sambal untuk 5 kotak</span>
+            </div>
+            <div class="fab-space"></div>
+          </div>
+          <div class="foot">
+            <div class="btn ghost">‹ Baru</div>
+            <div class="btn primary full">Tandai Diproses</div>
+          </div>
+          <div class="foot" style="border-top: 0; padding-top: 0">
+            <div class="btn ghost full small">Batalkan pesanan…</div>
+          </div>
+        </div>
+        <p class="screen-note">
+          Satu tombol utama untuk langkah berikutnya, satu tombol kecil untuk
+          mundur. Batal meminta alasan. Selesai dan Batal diganti tombol “Buka kembali”.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>
