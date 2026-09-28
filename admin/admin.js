@@ -11,6 +11,7 @@ import {
   loginErrorMessage,
   normalizePhone,
   parseRupiah,
+  priceLabel,
   toJakartaInput,
 } from "./lib.js";
 
@@ -130,10 +131,11 @@ async function confirmAdmin() {
 async function loadMenu() {
   const { data, error } = await supabase
     .from("menu_items")
-    .select("id, name, is_active")
+    .select("id, name, is_active, price, unit")
     .order("sort_order");
   if (error) toast(`Menu gagal dimuat. ${errorMessage(error)}`);
   else state.menu = data;
+  return error;
 }
 
 async function enterAdmin() {
@@ -493,7 +495,13 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
 
 function blankItem() {
   const first = state.menu.find((menu) => menu.is_active);
-  return { id: null, menu_item_id: first ? first.id : "", name: "", quantity: 1, unit_price: null };
+  return {
+    id: null,
+    menu_item_id: first ? first.id : "",
+    name: "",
+    quantity: 1,
+    unit_price: first?.price ?? null,
+  };
 }
 
 function menuOptions(item) {
@@ -641,7 +649,11 @@ async function renderForm(id) {
     const field = event.target.dataset.field;
     if (field === "quantity") item.quantity = Number(event.target.value);
     if (field === "unit_price") item.unit_price = parseRupiah(event.target.value);
-    if (field === "menu_item_id") item.menu_item_id = event.target.value;
+    if (field === "menu_item_id") {
+      item.menu_item_id = event.target.value;
+      item.unit_price = state.menu.find((menu) => menu.id === item.menu_item_id)?.price ?? null;
+      row.querySelector('[data-field="unit_price"]').value = item.unit_price ?? "";
+    }
     updateTotal();
   });
 
@@ -776,6 +788,104 @@ async function updateOrder(id, values, items, original) {
   return { id };
 }
 
+// Menu dan harga ---------------------------------------------------------------
+
+async function renderMenu() {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const error = await loadMenu();
+  if (seq !== renderSeq) return;
+  if (error) return renderProblem(errorMessage(error));
+
+  app.innerHTML = `
+    <section class="page has-actions">
+      ${flashHtml()}
+      <h1>Menu &amp; harga</h1>
+      <p class="small muted">
+        Harga tampil di kartu situs. Kosongkan harga kalau situs cukup menulis “Harga via WhatsApp”.
+        Pesanan yang sudah masuk tidak ikut berubah.
+      </p>
+      <form id="menu-form" class="stack" novalidate>
+        ${state.menu.map(menuRow).join("")}
+        <p class="error" data-error hidden></p>
+        <div class="sticky-actions">
+          <button class="btn primary full" type="submit">Simpan harga</button>
+        </div>
+      </form>
+    </section>`;
+
+  const form = app.querySelector("#menu-form");
+  const errorEl = form.querySelector("[data-error]");
+  const rows = [...form.querySelectorAll("[data-menu]")];
+  const readRow = (row) => ({
+    id: row.dataset.menu,
+    price: parseRupiah(row.querySelector('[name="price"]').value),
+    unit: row.querySelector('[name="unit"]').value.trim() || null,
+  });
+
+  form.addEventListener("input", (event) => {
+    const row = event.target.closest("[data-menu]");
+    if (!row) return;
+    const { price, unit } = readRow(row);
+    row.querySelector("[data-preview]").textContent = priceLabel(price, unit);
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+
+    const values = rows.map(readRow);
+    const invalid = values.find((value) => value.price != null && (value.price < 1 || value.price > 100_000_000));
+    if (invalid) {
+      const name = state.menu.find((menu) => menu.id === invalid.id).name;
+      return showError(errorEl, `Harga ${name} harus antara Rp1 dan Rp100.000.000. Kosongkan kalau belum ada harga.`);
+    }
+
+    const changed = values.filter((value) => {
+      const menu = state.menu.find((entry) => entry.id === value.id);
+      return menu.price !== value.price || menu.unit !== value.unit;
+    });
+    if (changed.length === 0) return toast("Tidak ada perubahan");
+
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    for (const { id, price, unit } of changed) {
+      const { error: updateError } = await supabase.from("menu_items").update({ price, unit }).eq("id", id);
+      if (updateError) {
+        submit.disabled = false;
+        const partial = changed.length > 1 ? " Menu lain mungkin sudah tersimpan; muat ulang untuk memeriksa." : "";
+        return showError(errorEl, errorMessage(updateError) + partial);
+      }
+    }
+    toast("Harga disimpan");
+    if (seq === renderSeq) renderMenu();
+    else loadMenu();
+  });
+}
+
+function menuRow(menu) {
+  return `
+    <div class="card" data-menu="${esc(menu.id)}">
+      <div class="row between">
+        <strong>${esc(menu.name)}</strong>
+        ${menu.is_active ? "" : `<span class="small muted">Disembunyikan</span>`}
+      </div>
+      <div class="menu-fields">
+        <label class="field">
+          <span>Harga</span>
+          <input class="input" name="price" inputmode="numeric" placeholder="Kosong"
+            value="${esc(menu.price ?? "")}" />
+        </label>
+        <label class="field">
+          <span>Satuan (opsional)</span>
+          <input class="input" name="unit" maxlength="20" placeholder="pack, box, porsi"
+            value="${esc(menu.unit ?? "")}" />
+        </label>
+      </div>
+      <span class="small muted">Di situs: <span data-preview>${esc(priceLabel(menu.price, menu.unit))}</span></span>
+    </div>`;
+}
+
 // Rute -----------------------------------------------------------------------
 
 function route() {
@@ -784,7 +894,14 @@ function route() {
   const uuid = "([0-9a-f-]{36})";
   let match;
 
+  const section = path === "/menu" ? "menu" : "pesanan";
+  topbar.querySelectorAll("[data-nav]").forEach((link) => {
+    if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+
   if (path === "/") return renderList();
+  if (path === "/menu") return renderMenu();
   if (path === "/baru") return renderForm(null);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}$`)))) return renderDetail(match[1]);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}/ubah$`)))) return renderForm(match[1]);

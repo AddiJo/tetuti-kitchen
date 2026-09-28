@@ -1,5 +1,44 @@
 const qtyState = {};
+const priceState = {};
 let heroInView = true;
+
+const rupiah = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  maximumFractionDigits: 0,
+});
+
+// Sama dengan pratinjau harga di halaman admin (admin/lib.js).
+function priceLabel(id) {
+  const entry = priceState[id];
+  if (!entry || entry.price == null) return "Harga via WhatsApp";
+  const amount = rupiah.format(entry.price);
+  return entry.unit ? `${amount} / ${entry.unit}` : amount;
+}
+
+// Kalau Supabase lambat atau gagal, kartu tetap menulis "Harga via WhatsApp".
+async function loadPrices() {
+  const { supabaseUrl, supabaseKey } = window.TETUTI;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/menu_items?select=id,price,unit`, {
+      headers: { apikey: supabaseKey },
+      signal: controller.signal,
+    });
+    if (response.ok) {
+      for (const row of await response.json()) priceState[row.id] = row;
+    }
+  } catch {
+    // Tetap dengan harga via WhatsApp.
+  } finally {
+    clearTimeout(timer);
+    document.querySelectorAll("[data-price]").forEach((el) => {
+      el.textContent = priceLabel(el.dataset.price);
+      el.classList.remove("is-loading");
+    });
+  }
+}
 
 function waLink(text) {
   const phone = window.TETUTI.whatsappNumber.replace(/\D/g, "");
@@ -14,7 +53,10 @@ function cartLines() {
 }
 
 function orderMessage(lines) {
-  const items = lines.map((line) => `• ${line.qty}x ${line.product.name}`);
+  const items = lines.map((line) => {
+    const price = priceState[line.product.id]?.price;
+    return `• ${line.qty}x ${line.product.name}${price == null ? "" : ` (${priceLabel(line.product.id)})`}`;
+  });
   return [
     `Halo ${window.TETUTI.storeName}`,
     "",
@@ -43,7 +85,7 @@ function renderProducts() {
           <h3>${item.name}</h3>
           <p>${item.desc}</p>
           <ul class="highlights">${points}</ul>
-          <div class="price">Harga via WhatsApp</div>
+          <div class="price is-loading" data-price="${item.id}">Harga via WhatsApp</div>
           <div class="card-actions">
             <div class="qty">
               <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi" ${qty === 0 ? "disabled" : ""}>−</button>
@@ -277,6 +319,7 @@ hydrateBrand();
 injectStructuredData();
 syncNavHeight();
 renderProducts();
+loadPrices();
 bindGrid();
 bindWaDock();
 bindNavSpy();

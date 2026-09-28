@@ -25,6 +25,12 @@ export function formatRp(amount) {
   return rupiah.format(amount);
 }
 
+// Sama dengan tulisan harga di kartu situs (js/app.js).
+export function priceLabel(price, unit) {
+  if (price == null) return "Harga via WhatsApp";
+  return unit ? `${formatRp(price)} / ${unit}` : formatRp(price);
+}
+
 export function formatDate(iso) {
   return iso ? dateTime.format(new Date(iso)) : "";
 }
@@ -70,6 +76,8 @@ const CONSTRAINT_MESSAGES = {
   order_items_quantity_check: "Jumlah item minimal 1.",
   order_items_unit_price_check: "Harga tidak boleh minus.",
   order_items_name_check: "Nama item wajib diisi.",
+  menu_items_price_check: "Harga menu harus antara Rp1 dan Rp100.000.000.",
+  menu_items_unit_check: "Satuan maksimal 20 karakter.",
 };
 
 export function errorMessage(error) {

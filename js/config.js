@@ -7,4 +7,7 @@ window.TETUTI = {
   whatsappNumber: "6281284966859",
   hours: "Pre-order via WhatsApp",
   area: "Siap antar / pickup",
+  // Kunci publishable memang untuk browser. Jangan taruh kunci secret di sini.
+  supabaseUrl: "https://vmqrwjzjxetjbrqfhnhr.supabase.co",
+  supabaseKey: "sb_publishable_lqsweWdUnLQYNcyPyYhmjw_ZJzDCNoR",
 };

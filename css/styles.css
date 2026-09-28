@@ -472,6 +472,10 @@ h2 {
   color: var(--maroon-dark);
 }
 
+.price.is-loading {
+  visibility: hidden;
+}
+
 .card-actions {
   display: flex;
   align-items: center;
