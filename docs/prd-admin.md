@@ -1,112 +1,155 @@
 # PRD — Admin Tetuti Kitchen
 
-Status: draf untuk dibangun. Belum ada kode admin.
+Status: fase 1 sebagian sudah tayang di `tetuti.my.id/admin` (login, daftar, catat manual, detail, status). Sisa fase 1 — harga dari admin dan pesanan situs yang masuk otomatis — belum dibangun.
 
-Situs publik tetap [tetuti.my.id](https://www.tetuti.my.id/): empat menu (Sambal Crispy, Paket Hantaran, Nasi Kotak, Sosis Solo), jumlah pesanan dipilih di kartu, lalu terbuka chat WhatsApp. Harga di situs tertulis “Harga via WhatsApp”. Nomor toko `081284966859`, area Jakarta, antar atau pickup, pre-order.
+Situs publik: [tetuti.my.id](https://www.tetuti.my.id/). Empat menu (Sambal Crispy, Paket Hantaran, Nasi Kotak, Sosis Solo). Nomor toko `081284966859`, area Jakarta, antar atau pickup, pre-order.
 
-Admin dibuat supaya pesanan, harga, tagihan, dan rekap tidak hanya hidup di riwayat chat.
+Sekarang pembeli memilih jumlah di kartu, lalu chat WhatsApp terbuka. Harga tertulis “Harga via WhatsApp”. Tidak ada pesanan yang tersimpan.
 
 ## Tujuan
 
-Pemilik toko bisa mencatat pesanan yang masuk dari WhatsApp, mengubah statusnya, memasang harga menu, membuat tagihan, dan melihat rekap penjualan — dari satu halaman admin.
+Pesanan yang dibuat pembeli di situs langsung tampil di dashboard admin, lengkap dengan data pembeli dan harga, tanpa disalin dari chat. Pemilik toko mengatur harga menu dari admin, memproses pesanan sampai selesai, membuat tagihan, dan melihat rekap penjualan.
 
 ## Bukan tujuan
 
-- Mengganti WhatsApp sebagai tempat ngobrol dengan pembeli.
-- Menarik pesanan otomatis dari WhatsApp Business API.
-- Login pembeli, keranjang tersimpan, atau pembayaran di dalam situs.
+- Menarik pesanan dari chat WhatsApp (WhatsApp Business API).
+- Login pembeli, keranjang tersimpan antar kunjungan, atau pembayaran di dalam situs.
+- Pembeli melacak status pesanannya sendiri di situs.
+- Notifikasi push ke HP saat halaman admin tertutup.
 - Banyak akun, peran kasir/dapur, atau stok bahan baku.
 - Ongkir otomatis dari peta.
 
 ## Pengguna
 
-Satu orang: pemilik Tetuti Kitchen. Tidak ada peran kedua di versi ini.
+- Pemilik Tetuti Kitchen: satu akun admin.
+- Pembeli: pengunjung situs tanpa akun.
 
 ## Urutan bangun
 
-Peta fitur menaruh login di fase 3. Halaman admin tidak boleh dibuka ke internet sebelum ada masuk akun. Karena itu **masuk dan keluar akun ikut fase 1**. Atur ulang sandi tetap fase 3.
+Halaman admin tidak boleh dibuka ke internet sebelum ada masuk akun, jadi masuk dan keluar akun ikut fase 1. Harga harus bisa diatur sebelum pesanan situs masuk, supaya pesanan membawa harga; karena itu ubah harga ditarik dari fase 2 ke fase 1.
 
 | Fase | Modul | Selesai kalau |
 | --- | --- | --- |
-| 1 | Pesanan masuk, plus masuk/keluar akun | Pesanan dari chat bisa dicatat, dibuka detailnya, dan statusnya diubah. Tanpa sandi yang benar, data pesanan tidak tampil. |
-| 2 | Kelola menu & harga, buat tagihan | Harga dan foto menu yang disimpan admin tampil di situs. Dari pesanan terkonfirmasi bisa dibuat tagihan dan dikirim ke WhatsApp pembeli. |
+| 1 | Pesanan masuk: login, harga menu, pesanan situs otomatis, bunyi pesanan baru, catat manual, status | Pembeli memesan di situs dan pesanannya muncul sendiri di dashboard dengan bunyi. Harga yang diubah admin tampil di situs. |
+| 2 | Kelola menu lengkap, buat tagihan | Menu bisa ditambah, disembunyikan, dan diberi foto dari admin. Dari pesanan terkonfirmasi bisa dibuat tagihan dan dikirim ke WhatsApp pembeli. |
 | 3 | Atur ulang sandi, laporan penjualan | Sandi bisa diganti saat sudah masuk. Ada ringkasan hari ini, rekap periode, dan menu terlaris. |
-| 4 | Pengaturan toko | Nama toko, nomor WhatsApp, area antar/pickup, dan info pembayaran di situs mengikuti isian admin. |
+| 4 | Pengaturan toko | Nama toko, nomor WhatsApp, area, dan info pembayaran di situs mengikuti isian admin. |
+
+Urutan kerja sisa fase 1:
+
+1. Harga menu diatur dari admin dan tampil di situs.
+2. Pesanan dari situs tersimpan dan masuk otomatis ke dashboard.
+3. Bunyi dan tanda di tab browser saat pesanan baru masuk.
 
 ## Fase 1 — Pesanan masuk
 
-Pembeli tetap memesan lewat situs → WhatsApp, seperti sekarang. Admin menyalin isi chat ke pesanan baru. Tidak ada pengambilan chat otomatis.
+### Harga menu
+
+Ubah harga dari subfitur “Kelola Menu & Harga” dikerjakan di fase 1. Tambah menu, foto, dan sembunyikan menu tetap fase 2.
+
+- Admin punya halaman Menu: empat menu dengan kolom harga dan satuan (opsional, misalnya “per pack” atau “per box”).
+- Harga dalam rupiah bulat. Kosong berarti belum ada harga.
+- Situs membaca harga saat dibuka. Menu berharga tampil “Rp25.000 / pack”. Menu tanpa harga tetap bisa dipesan dan tertulis “Harga via WhatsApp”.
+- Kalau harga gagal dimuat (internet lambat atau Supabase terganggu), kartu tetap tampil dengan “Harga via WhatsApp” dan tetap bisa dipesan.
+- Teks kartu, badge, dan foto tetap dari `js/products.js` sampai fase 2.
+- Mengubah harga tidak mengubah pesanan yang sudah masuk. Harga disalin ke pesanan saat pesanan dibuat.
+
+### Pesanan dari situs
+
+Pembeli tetap memilih jumlah di kartu. Tombol “Pesan” dan “Pesan semua” tidak lagi membuka WhatsApp, tapi membuka form pesanan.
+
+Form pesanan:
+
+- Ringkasan item: jumlah, harga satuan, subtotal. Item tanpa harga tertulis “Harga via WhatsApp”.
+- Nama (wajib).
+- Nomor WhatsApp (wajib). Boleh ditulis 08…, +62…, atau 62….
+- Pickup atau antar (wajib).
+- Alamat (wajib kalau antar).
+- Catatan (opsional), misalnya tanggal acara atau level pedas.
+- Keterangan: “Ongkir dan jadwal dikonfirmasi Tetuti Kitchen lewat WhatsApp.”
+- Keterangan: “Data ini hanya dipakai untuk menghubungi Anda soal pesanan ini.”
+
+Setelah dikirim, pembeli melihat layar terima kasih: kode pesanan, total sementara (tanpa ongkir), dan kalimat bahwa Tetuti Kitchen akan menghubungi lewat WhatsApp ke nomor yang diisi. WhatsApp tidak dibuka otomatis.
+
+Kalau pengiriman gagal, pembeli melihat pesan gagal dan pilihan “Pesan lewat WhatsApp” yang membuka chat seperti sekarang, supaya pesanan tidak hilang.
+
+Aturan pesanan dari situs:
+
+- Masuk dengan status Baru dan sumber “Situs”. Pesanan manual bersumber “Admin”.
+- Harga item diambil dari database saat pesanan dibuat, bukan dari angka yang dikirim browser.
+- Hanya menu aktif. 1–10 baris item, jumlah per item 1–200.
+- Nomor WhatsApp yang sama maksimal 6 pesanan per jam.
+- Semua pesanan dari situs maksimal 60 per jam, untuk menahan banjir pesanan palsu.
+- Form punya kolom jebakan yang tidak terlihat manusia. Pengiriman yang mengisinya dibuang.
+- Pembeli tidak bisa membaca pesanan apa pun, termasuk miliknya sendiri. Yang dikembalikan hanya kode pesanan.
+- Nomor WhatsApp tidak bisa dipastikan milik pembeli sampai admin menghubunginya. Pesanan palsu dibatalkan dengan alasan.
+
+### Dashboard pesanan baru
+
+- Pesanan baru dari situs muncul di daftar tanpa refresh selama halaman admin terbuka.
+- Bunyi pendek saat pesanan baru masuk. Browser hanya mengizinkan bunyi setelah halaman pernah diklik, jadi kalau bunyi belum aktif, dashboard menampilkan tombol “Aktifkan bunyi”.
+- Judul tab menunjukkan jumlah pesanan baru yang belum dibuka, misalnya “(2) Admin — Tetuti Kitchen”. Angka berkurang saat detail pesanan dibuka.
+- Kartu pesanan situs yang belum dibuka diberi tanda “Baru masuk”.
+- Kalau sambungan langsung terputus, daftar tetap diperbarui otomatis setiap 60 detik.
+- Bunyi dan tanda hanya bekerja saat halaman admin terbuka di browser. Kalau HP terkunci atau tab ditutup, pesanan tetap tersimpan dan terlihat saat admin dibuka lagi.
 
 ### Daftar pesanan
 
 - Daftar terbaru di atas.
-- Setiap baris: kode pesanan, nama pembeli, ringkasan item, total kalau harga sudah ada, status, tanggal.
+- Setiap baris: kode pesanan, nama pembeli, ringkasan item, total kalau harga sudah ada, status, sumber, tanggal.
 - Filter status. Pencarian nama atau kode.
-- Daftar kosong menampilkan tombol catat pesanan, bukan halaman blank.
+- Daftar kosong menampilkan penjelasan, bukan halaman blank.
+
+### Catat pesanan manual
+
+Tetap ada untuk pembeli yang langsung chat tanpa lewat situs. Isiannya sama dengan form situs, ditambah waktu yang diminta, ongkir, dan harga per item yang boleh diisi manual.
 
 ### Detail pesanan
 
-- Identitas: nama, nomor WhatsApp, catatan.
+- Identitas: nama, nomor WhatsApp dengan tombol Buka WhatsApp, catatan.
 - Pemenuhan: antar atau pickup, alamat bila antar, waktu yang diminta.
-- Item: menu, jumlah, harga satuan, subtotal. Harga boleh kosong saat pesanan baru dicatat, lalu diisi saat konfirmasi.
-- Total = jumlah subtotal. Ongkir satu angka terpisah, boleh nol.
+- Item: menu, jumlah, harga satuan, subtotal. Harga boleh kosong sampai konfirmasi.
+- Total = jumlah subtotal + ongkir. Ongkir diisi admin setelah disepakati di chat.
 
 ### Ubah status
 
-Urutan status:
-
-1. Baru — baru dicatat, harga atau stok belum dikonfirmasi.
-2. Dikonfirmasi — harga, stok, dan jadwal sudah disepakati.
+1. Baru — pesanan masuk, harga, ongkir, atau jadwal belum dikonfirmasi.
+2. Dikonfirmasi — harga, ongkir, dan jadwal sudah disepakati.
 3. Diproses — sedang dibuat.
 4. Siap — siap diantar atau diambil.
 5. Selesai.
 6. Batal — wajib isi alasan. Pesanan batal tidak masuk omzet.
 
-Status boleh mundur satu langkah (misalnya Siap kembali ke Diproses), kecuali Selesai dan Batal yang hanya bisa dibuka lagi lewat aksi eksplisit “buka kembali”.
-
-### Info pelanggan dan antar/pickup
-
-Ini usulan untuk subfitur keempat yang tertutup di peta.
-
-- Nama dan nomor WhatsApp wajib.
-- Pilihan antar atau pickup wajib.
-- Alamat wajib hanya jika antar.
-- Catatan bebas untuk permintaan rasa, porsi acara, atau jam ambil.
+Status maju atau mundur satu langkah. Selesai dibuka kembali ke Siap, Batal ke Baru. Pesanan tidak bisa dikonfirmasi sebelum semua item punya harga.
 
 ### Masuk dan keluar akun
 
 Login memakai Supabase Auth dengan email dan sandi.
 
-- Satu akun. Pendaftaran akun baru dimatikan di pengaturan Supabase. Akun pemilik dibuat dari dashboard Supabase, lalu dicatat di tabel `admins`.
-- Sandi tidak pernah tampil setelah disimpan.
+- Satu akun. Pendaftaran akun baru dimatikan. Akun pemilik dibuat dari dashboard Supabase, lalu dicatat di tabel `admins`.
 - Pesan salah login selalu sama, tidak membedakan email salah atau sandi salah.
-- Sesi habis setelah 12 jam tidak dipakai, atau saat keluar. Pengaturan sesi Supabase (time-box dan inactivity timeout) hanya ada di paket Pro, jadi batas 12 jam dijalankan oleh kode halaman admin: waktu aktivitas terakhir disimpan di perangkat, dan halaman keluar sendiri kalau sudah lewat 12 jam.
-- Percobaan login yang berulang dibatasi oleh pembatas bawaan Supabase Auth: 10 percobaan per 5 menit per alamat IP (bawaannya 30, sudah diturunkan). Kunci per akun setelah lima salah sandi tidak tersedia, jadi tidak dibuat di fase 1. Karena itu sandi admin wajib panjang dan unik.
+- Sesi habis setelah 12 jam tidak dipakai, atau saat keluar. Pengaturan sesi Supabase hanya ada di paket Pro, jadi batas 12 jam dijalankan oleh kode halaman admin.
+- Percobaan login dibatasi 10 kali per 5 menit per alamat IP (pengaturan Supabase, bawaannya 30). Kunci per akun tidak tersedia, jadi sandi admin wajib panjang dan unik.
 - Keluar menghapus sesi di perangkat itu.
 
-Batas sesi dan pembatas login sudah dicek di dashboard Supabase (28 Sep 2026).
+## Fase 2 — Menu lengkap dan tagihan
 
-## Fase 2 — Menu, harga, dan tagihan
+### Kelola menu
 
-### Kelola menu & harga
+Teks kartu, badge, dan foto pindah dari `js/products.js` ke database.
 
-Menu situs publik dibaca dari data yang disimpan admin, bukan lagi daftar tetap di `js/products.js`. Empat menu yang ada sekarang menjadi data awal.
-
-- Tambah menu: nama, kategori (camilan, hantaran, catering), badge, kalimat singkat, deskripsi, tiga sorotan, harga, satuan (porsi, paket, atau box).
-- Ubah harga: harga tersimpan dan langsung dipakai pesanan baru serta situs publik. Pesanan yang sudah dikonfirmasi tidak berubah saat harga menu diubah.
-- Upload foto: JPG atau PNG, dipakai kartu menu. Foto yang gagal diunggah tidak menghapus foto lama.
-- Sembunyikan menu (usulan subfitur keempat): menu nonaktif hilang dari situs, pesanan lama tetap menampilkan namanya.
-
-Situs publik menampilkan harga. Ongkir dan jadwal tetap dikonfirmasi di WhatsApp, sama seperti kalimat yang sudah ada di halaman cara pesan.
+- Tambah menu: nama, kategori (camilan, hantaran, catering), badge, kalimat singkat, deskripsi, tiga sorotan, harga, satuan.
+- Upload foto: JPG atau PNG. Foto yang gagal diunggah tidak menghapus foto lama.
+- Sembunyikan menu: hilang dari situs, pesanan lama tetap menampilkan namanya.
 
 ### Buat tagihan bayar
 
 Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, Siap, atau Selesai.
 
-- Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total. Kode tagihan terlihat di detail pesanan.
-- Pilih cara bayar: transfer, QRIS, atau tunai. Detail rekening/QR menyusul di fase 4; sampai itu, admin mengisi instruksi singkat per tagihan.
-- Kirim tagihan: membuka WhatsApp ke nomor pembeli dengan teks item, total, cara bayar, dan kode tagihan. Admin yang menekan kirim di WhatsApp.
-- Tandai lunas (usulan subfitur keempat): nominal yang diterima dan waktu lunas. Tagihan yang sudah lunas tidak bisa diubah isinya. Batalkan pelunasan hanya lewat aksi terpisah.
+- Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
+- Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
+- Kirim tagihan: membuka WhatsApp ke nomor pembeli dengan teks item, total, cara bayar, dan kode tagihan.
+- Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci.
 
 Status tagihan: Draft, Terkirim, Lunas, Batal.
 
@@ -114,25 +157,20 @@ Status tagihan: Draft, Terkirim, Lunas, Batal.
 
 ### Atur ulang sandi
 
-- Hanya saat sudah masuk.
-- Minta sandi lama, sandi baru, dan ulang sandi baru.
-- Sandi baru minimal 8 karakter.
-- Setelah ganti sandi, sesi lain dianggap habis.
+- Hanya saat sudah masuk. Sandi lama, sandi baru, ulang sandi baru. Minimal 8 karakter.
+- Setelah ganti sandi, sesi di perangkat lain habis.
 
 ### Laporan penjualan
 
-Angka dihitung dari pesanan yang tidak batal. Omzet dihitung dari tagihan lunas. Pesanan tanpa tagihan lunas tampil sebagai belum dibayar, bukan sebagai pemasukan.
+Pesanan batal tidak dihitung. Omzet dari tagihan lunas. Hari ini mengikuti zona waktu Jakarta.
 
-- Ringkasan hari ini: jumlah pesanan, pesanan belum selesai, omzet lunas, nominal belum dibayar.
-- Rekap per periode: pilih tanggal mulai dan selesai, tabel harian jumlah pesanan dan omzet.
-- Menu terlaris: peringkat menu menurut jumlah porsi pada periode yang sama, termasuk menu yang sudah disembunyikan.
-- Belum lunas (usulan subfitur keempat): daftar tagihan terkirim yang belum ditandai lunas, diurutkan dari yang paling lama.
-
-Hari ini mengikuti zona waktu Jakarta.
+- Ringkasan hari ini: jumlah pesanan, belum selesai, omzet lunas, nominal belum dibayar.
+- Rekap per periode: tabel harian jumlah pesanan dan omzet.
+- Menu terlaris: peringkat menurut jumlah porsi, termasuk menu yang disembunyikan.
+- Belum lunas: tagihan terkirim yang belum lunas, yang paling lama di atas.
+- Sumber pesanan: berapa dari situs, berapa dicatat manual.
 
 ## Fase 4 — Pengaturan toko
-
-Nilai awal diambil dari situs sekarang.
 
 | Isian | Nilai awal |
 | --- | --- |
@@ -143,77 +181,66 @@ Nilai awal diambil dari situs sekarang.
 | Jam | Pre-order via WhatsApp |
 | Area | Siap antar / pickup |
 
-### Info toko
-
-- Ubah nama, tagline, kota, nomor WhatsApp, jam, dan area.
-- Nomor disimpan sebagai `62…` tanpa spasi. Di situs tampil sebagai `08…`.
-- Simpan baru dianggap berhasil jika situs publik memakai nilai baru pada kunjungan berikutnya.
-
-### Info pembayaran
-
-- Minimal satu cara bayar aktif.
-- Transfer: nama bank, nomor rekening, atas nama.
-- QRIS: satu gambar QR.
-- Tunai: catatan singkat, misalnya “dibayar saat pickup”.
-- Cara bayar yang diisi di sini menjadi pilihan saat buat tagihan, menggantikan instruksi singkat di fase 2.
+- Info toko: ubah isian di atas. Nomor disimpan sebagai `62…`, tampil sebagai `08…`.
+- Info pembayaran: transfer (bank, rekening, atas nama), QRIS (satu gambar), tunai (catatan). Minimal satu aktif. Menjadi pilihan saat buat tagihan.
 
 ## Data yang disimpan
 
-Backend: Supabase (Postgres, Auth, Storage). Skema fase 1 ada di `supabase/migrations/20260928000000_fase1_pesanan.sql`. Sketsa layarnya di `docs/wireframe-fase1.html`.
+Backend: Supabase (Postgres, Auth, Realtime, Storage) di region Singapore. Skema fase 1 ada di `supabase/migrations/`. Sketsa layar di `docs/wireframe-fase1.html`.
 
-- Akun: dikelola Supabase Auth, sandi tersimpan dalam bentuk hash. Tabel `admins` menandai akun mana yang boleh membuka admin.
-- Menu: identitas, teks kartu, harga, satuan, foto, aktif/nonaktif, urutan.
-- Pesanan: kode, pembeli, antar/pickup, item, ongkir, status, alasan batal, waktu dibuat dan waktu status terakhir.
-- Tagihan: kode, pesanan terkait, cara bayar, status, waktu kirim, waktu lunas, nominal diterima.
-- Toko: isian info toko dan info pembayaran.
+- Akun: Supabase Auth. Tabel `admins` menandai akun admin.
+- Menu: identitas, nama, kategori, harga, satuan, aktif, urutan. Teks kartu dan foto menyusul di fase 2.
+- Pesanan: kode, sumber (situs/admin), pembeli, antar/pickup, alamat, catatan, item dengan harga saat dipesan, ongkir, status, alasan batal, waktu dibuat, waktu status terakhir, waktu pertama dibuka admin.
+- Tagihan (fase 2), toko (fase 4).
 
-Kode pesanan berbentuk `TK-HHBBTTTT-01` (tanggal Jakarta plus urutan harian). Kode tagihan memakai kode pesanan ditambah `-INV`.
+Kode pesanan `TK-DDMMYYYY-NN`: tanggal Jakarta plus urutan harian, sama untuk pesanan situs dan manual.
+
+Hak akses:
+
+- Pengunjung tanpa login: hanya membaca nama dan harga menu aktif, dan mengirim pesanan lewat satu fungsi database yang memeriksa semua aturan di atas. Tidak bisa membaca atau mengubah tabel lain.
+- Admin: membaca dan mengubah semuanya lewat aturan RLS.
 
 ## Ukuran berhasil
 
-- Pesanan yang dicatat masih ada setelah admin menutup browser dan masuk lagi.
+- Pesanan yang dikirim pembeli di situs muncul di dashboard admin yang sedang terbuka dalam hitungan detik, dengan bunyi.
+- Harga yang diubah admin tampil di situs pada kunjungan berikutnya.
+- Harga di pesanan sama dengan harga menu saat pesanan dibuat, walaupun harga menu diubah kemudian.
+- Pengunjung tanpa login tidak bisa membaca pesanan siapa pun.
+- Pesanan ke-7 dari nomor yang sama dalam satu jam ditolak.
+- Situs tetap bisa dipakai memesan lewat WhatsApp kalau database sedang tidak bisa dihubungi.
 - Mengubah status tidak mengubah item atau total.
-- Mengubah harga menu tidak mengubah pesanan yang sudah dikonfirmasi.
-- Teks tagihan yang dibuka ke WhatsApp sama dengan total di detail pesanan.
-- Menu nonaktif tidak muncul di situs, dan pesanan lamanya tetap kebaca.
-- Laporan hari ini tidak menghitung pesanan batal sebagai omzet.
+- Laporan tidak menghitung pesanan batal sebagai omzet.
 
-## Keputusan yang dipakai di draf ini
+## Keputusan
 
-Empat subfitur di peta tertutup (“Lihat semua”). Draf ini mengisinya dengan info pelanggan, sembunyikan menu, tandai lunas, dan daftar belum lunas. Ganti kalau maksud aslinya berbeda.
-
-Pesanan fase 1 dicatat manual dari chat. Situs publik belum menyimpan pesanan sendiri.
-
-Harga tampil di situs mulai fase 2. Ongkir tetap di luar harga menu.
-
-Admin tinggal di situs yang sama, di `tetuti.my.id/admin`: halaman HTML biasa dengan `supabase-js` dari CDN, tanpa framework. Halaman ini tidak diindeks Google.
+- Empat subfitur di peta yang tertutup (“Lihat semua”) diisi: info pelanggan, sembunyikan menu, tandai lunas, daftar belum lunas.
+- Pesanan situs masuk otomatis ke admin. Setelah mengirim, pembeli tidak diarahkan ke WhatsApp; admin yang menghubungi. WhatsApp hanya dibuka pembeli kalau pengiriman gagal. (Keputusan pemilik, 28 Sep 2026.)
+- Data pembeli: nama, WhatsApp, pickup/antar, alamat bila antar, catatan opsional.
+- Menu tanpa harga tetap bisa dipesan dengan tulisan “Harga via WhatsApp”.
+- Dashboard memperbarui sendiri, dengan bunyi dan angka di judul tab.
+- Catat pesanan manual tetap ada.
+- Admin di `tetuti.my.id/admin`: HTML biasa dengan `supabase-js` dari CDN, tanpa framework, tidak diindeks Google.
 
 ## Langkah berikutnya
 
-Sudah selesai: PRD, skema fase 1 (lolos 24 uji di Postgres lokal), sketsa layar fase 1, dan `.vercelignore` untuk `docs/` dan `supabase/`. Semuanya belum di-commit.
+Sudah selesai dan tayang: proyek Supabase (Singapore), skema fase 1, akun admin, halaman `admin/` dengan login, daftar, catat manual, detail, dan status. Diuji dengan akun pemilik pada 28 Sep 2026; pesanan uji sudah dihapus.
 
-Dikerjakan pemilik toko di dashboard Supabase:
+Langkah 1 — harga menu:
 
-- [x] Buat proyek Supabase baru, region Singapore (`ap-southeast-1`). Proyek awal di Mumbai sudah dihapus.
-- [x] Authentication → Sign In / Providers: matikan pendaftaran akun baru.
-- [x] Cek Authentication → Sessions: hanya paket Pro, batas 12 jam lewat kode admin.
-- [x] Authentication → Rate Limits: sign-ups and sign-ins diturunkan dari 30 ke 10 per 5 menit per IP.
-- [x] SQL Editor: jalankan `supabase/migrations/20260928000000_fase1_pesanan.sql`. Dicek: 5 tabel, 4 menu, RLS aktif di semua tabel.
-- [x] Authentication → Users: buat akun pemilik (email dan sandi).
-- [x] SQL Editor: tandai akun itu sebagai admin:
-  `insert into public.admins (user_id) select id from auth.users where email = 'EMAIL_PEMILIK';`
-- [x] Kirim ke agen: Project URL dan anon/publishable key. Dicek dari luar: pendaftaran ditolak, pengunjung tanpa login tidak bisa membaca atau menulis tabel mana pun. Kunci ini memang dipakai di browser dan aman dibagikan. **Jangan** kirim `service_role` key atau sandi database.
+- [ ] Agen: migrasi kolom harga dan satuan, akses baca menu untuk pengunjung.
+- [ ] Pemilik: jalankan migrasi di SQL Editor.
+- [ ] Agen: halaman Menu di admin, harga tampil di kartu situs.
+- [ ] Uji, lalu pemilik mengisi harga asli, commit, dan push.
 
-Dikerjakan agen setelah itu:
+Langkah 2 — pesanan situs otomatis:
 
-- [x] Bangun `admin/`: halaman masuk, daftar pesanan, catat pesanan, detail dan ubah status, sesuai sketsa.
-- [x] Terjemahkan pesan error database ke kalimat Indonesia (misalnya alamat wajib untuk antar, format nomor WhatsApp).
-- [x] Tambah `noindex` di halaman admin dan `Disallow: /admin` di `robots.txt`.
-- [x] Uji halaman masuk dengan proyek Supabase asli (salah sandi menampilkan pesan Indonesia). Fungsi bantu lolos 18 uji.
-- [x] Uji alur setelah masuk dengan akun pemilik (28 Sep 2026): catat pickup dan antar, validasi nomor dan alamat, isi harga, hapus item, status maju-mundur-selesai, batal beralasan, buka kembali, cari, filter, keluar otomatis setelah 12 jam.
-- [x] Hapus pesanan uji (`UJI …`) lewat SQL Editor, nomor urut hari itu dikembalikan.
+- [ ] Agen: migrasi fungsi kirim pesanan (validasi, harga dari database, batas per nomor dan per jam), kolom sumber dan waktu dibuka.
+- [ ] Pemilik: jalankan migrasi.
+- [ ] Agen: form pesanan dan layar terima kasih di situs, penanda sumber di admin.
+- [ ] Uji dari HP sebagai pembeli, lalu commit dan push.
 
-Dikerjakan pemilik toko:
+Langkah 3 — bunyi pesanan baru:
 
-- [ ] Commit dan push, lalu cek `tetuti.my.id/admin` dari HP.
-- [ ] Pakai untuk pesanan asli selama beberapa hari, catat yang kurang, baru lanjut ke fase 2 (harga, foto menu, tagihan).
+- [ ] Pemilik: nyalakan Realtime untuk tabel `orders` (atau lewat migrasi).
+- [ ] Agen: daftar memperbarui sendiri, bunyi, angka di judul tab, tanda “Baru masuk”.
+- [ ] Uji dengan dua perangkat: pesan dari HP, dengar bunyi di admin.
