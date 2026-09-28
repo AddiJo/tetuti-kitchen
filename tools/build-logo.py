@@ -80,6 +80,8 @@ def main():
 
     logo.resize((512, 512), Image.LANCZOS).save("assets/logo-cabai.png")
     on_cream(logo, 32, 0.28).save("assets/favicon-32.png")
+    # Google hanya memakai favicon persegi dengan sisi kelipatan 48 px.
+    on_cream(logo, 192, 0.24).save("assets/favicon-192.png")
     on_cream(logo, 180, 0.22).save("assets/apple-touch-icon.png")
     on_cream(logo, 64, 0.28).save(
         "assets/favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)]
