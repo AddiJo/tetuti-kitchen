@@ -1,0 +1,22 @@
+---
+description: Tidak boleh ada server atau proses uji coba yang tertinggal jalan di komputer lokal
+alwaysApply: true
+---
+
+# Server lokal
+
+Pemilik repo tidak mau ada apa pun yang tetap jalan di komputernya setelah uji coba.
+
+- Server pratinjau, database uji, atau proses latar lain hanya dijalankan selama dibutuhkan, lalu dimatikan di giliran yang sama.
+- Server pratinjau selalu `--bind 127.0.0.1`, jangan terbuka ke semua jaringan.
+- Setelah mematikan, **cek ulang** dan jangan anggap berhasil tanpa bukti:
+
+```bash
+ps -axo pid,command | rg 'http\.server|postgres|pg_ctl|vite|next|node .*serve' | rg -v ' rg '
+lsof -nP -iTCP -sTCP:LISTEN
+```
+
+- `kill` di dalam sandbox bisa gagal diam-diam. Jangan buang pesan error dengan `2>/dev/null`. Kalau proses masih ada, ulangi dengan izin di luar sandbox.
+- Di zsh, daftar PID dalam variabel tidak dipecah otomatis. Tulis PID langsung: `kill 123 456`.
+- Laporkan ke pemilik repo bahwa server sudah mati dan hasil pengecekannya.
+- Jangan menyalakan Docker Desktop atau layanan sistem lain tanpa izin.
