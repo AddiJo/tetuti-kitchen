@@ -857,9 +857,9 @@ async function renderMenu() {
         return showError(errorEl, errorMessage(updateError) + partial);
       }
     }
+    await loadMenu();
     toast("Harga disimpan");
-    if (seq === renderSeq) renderMenu();
-    else loadMenu();
+    if (seq === renderSeq) location.hash = "#/";
   });
 }
 
