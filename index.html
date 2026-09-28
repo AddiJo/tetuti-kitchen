@@ -141,7 +141,7 @@
             <div>
               <p class="kicker">Gampang banget</p>
               <h2>Cara pesan</h2>
-              <p>Stok, harga, dan pengiriman dikonfirmasi di WhatsApp.</p>
+              <p>Pesan langsung di sini. Ongkir dan jadwal kami konfirmasi lewat WhatsApp.</p>
             </div>
           </div>
           <div class="steps">
@@ -152,13 +152,13 @@
             </article>
             <article class="step">
               <span>2</span>
-              <h3>Klik Pesan</h3>
-              <p>Klik Pesan di satu kartu, atau Pesan semua kalau mau beberapa produk.</p>
+              <h3>Isi data</h3>
+              <p>Klik Pesan, lalu isi nama, nomor WhatsApp, dan pickup atau antar.</p>
             </article>
             <article class="step">
               <span>3</span>
-              <h3>Konfirmasi</h3>
-              <p>Kami infokan harga, ketersediaan, dan waktu siap.</p>
+              <h3>Kami hubungi</h3>
+              <p>Kami chat lewat WhatsApp untuk konfirmasi ongkir, pembayaran, dan waktu siap.</p>
             </article>
           </div>
         </div>
@@ -175,9 +175,59 @@
     <div class="checkout" hidden>
       <div class="wrap checkout-inner">
         <p class="checkout-summary" aria-live="polite"></p>
-        <a class="btn btn-primary checkout-btn" data-checkout href="#">Pesan semua</a>
+        <button class="btn btn-primary checkout-btn" type="button" data-checkout>Pesan semua</button>
       </div>
     </div>
+
+    <dialog class="order-sheet" id="order-sheet" aria-labelledby="order-title">
+      <form class="order-form" data-order-form novalidate>
+        <div class="sheet-head">
+          <h2 id="order-title">Pesanan kamu</h2>
+          <button type="button" class="sheet-close" data-sheet-close aria-label="Tutup">×</button>
+        </div>
+        <ul class="order-lines" data-order-lines></ul>
+        <p class="order-total" data-order-total></p>
+        <label class="field">
+          <span>Nama</span>
+          <input name="name" autocomplete="name" maxlength="80" required />
+        </label>
+        <label class="field">
+          <span>Nomor WhatsApp</span>
+          <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0812 3456 7890" required />
+        </label>
+        <fieldset class="choice">
+          <legend>Cara terima</legend>
+          <label><input type="radio" name="fulfillment" value="pickup" checked /> <span>Pickup</span></label>
+          <label><input type="radio" name="fulfillment" value="antar" /> <span>Antar</span></label>
+        </fieldset>
+        <label class="field" data-address hidden>
+          <span>Alamat antar</span>
+          <textarea name="address" rows="2" maxlength="300"></textarea>
+        </label>
+        <label class="field">
+          <span>Catatan (opsional)</span>
+          <textarea name="note" rows="2" maxlength="500" placeholder="Tanggal acara, level pedas, dll."></textarea>
+        </label>
+        <label class="trap" aria-hidden="true">
+          Website
+          <input name="website" tabindex="-1" autocomplete="off" />
+        </label>
+        <p class="form-hint">
+          Ongkir dan jadwal dikonfirmasi Tetuti Kitchen lewat WhatsApp. Data ini hanya dipakai untuk
+          menghubungi kamu soal pesanan ini.
+        </p>
+        <p class="form-error" data-order-error role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Kirim pesanan</button>
+      </form>
+      <div class="order-done" data-order-done hidden>
+        <h2>Pesanan terkirim</h2>
+        <p class="form-hint">Kode pesanan</p>
+        <p class="order-code" data-order-code></p>
+        <p class="order-total" data-order-done-total></p>
+        <p>Tetuti Kitchen akan menghubungi kamu lewat WhatsApp di <strong data-order-phone></strong>.</p>
+        <button class="btn btn-primary btn-block" type="button" data-sheet-close>Selesai</button>
+      </div>
+    </dialog>
 
     <a class="wa-dock" data-wa-chat href="#" aria-hidden="true" tabindex="-1">
       <span class="wa-dock-icon" aria-hidden="true">

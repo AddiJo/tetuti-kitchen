@@ -118,16 +118,7 @@ function syncCheckout() {
       : "";
   }
 
-  if (button) {
-    if (hasCart) {
-      button.setAttribute("href", waLink(orderMessage(lines)));
-      button.setAttribute("target", "_blank");
-      button.setAttribute("rel", "noopener");
-    } else {
-      button.setAttribute("href", "#");
-      button.removeAttribute("target");
-    }
-  }
+  if (button) button.disabled = !hasCart;
 
   document.body.classList.toggle("has-checkout", hasCart);
   updateDock();
@@ -151,9 +142,171 @@ function bindGrid() {
 
     if (orderBtn) {
       const product = window.TETUTI_PRODUCTS.find((item) => item.id === orderBtn.dataset.order);
-      const qty = qtyState[product.id] || 1;
-      window.open(waLink(orderMessage([{ product, qty }])), "_blank", "noopener");
+      openOrder([{ product, qty: qtyState[product.id] || 1 }]);
     }
+  });
+
+  document.querySelector("[data-checkout]")?.addEventListener("click", () => {
+    const lines = cartLines();
+    if (lines.length) openOrder(lines);
+  });
+}
+
+// Form pesanan ----------------------------------------------------------------
+
+let orderLines = [];
+
+function normalizePhone(raw) {
+  let digits = String(raw || "").replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = `62${digits.slice(1)}`;
+  else if (digits.startsWith("8")) digits = `62${digits}`;
+  return digits;
+}
+
+function linesSubtotal(lines) {
+  if (lines.some((line) => priceState[line.product.id]?.price == null)) return null;
+  return lines.reduce((sum, line) => sum + priceState[line.product.id].price * line.qty, 0);
+}
+
+function openOrder(lines) {
+  const sheet = document.getElementById("order-sheet");
+  const form = sheet.querySelector("[data-order-form]");
+  orderLines = lines.map((line) => ({ ...line }));
+
+  sheet.querySelector("[data-order-lines]").innerHTML = orderLines
+    .map((line) => {
+      const price = priceState[line.product.id]?.price;
+      const amount = price == null ? "Harga via WhatsApp" : rupiah.format(price * line.qty);
+      return `<li><span>${line.qty}× ${line.product.name}</span><span>${amount}</span></li>`;
+    })
+    .join("");
+
+  const subtotal = linesSubtotal(orderLines);
+  sheet.querySelector("[data-order-total]").textContent =
+    subtotal == null
+      ? "Harga sebagian menu dikonfirmasi lewat WhatsApp."
+      : `Total sementara ${rupiah.format(subtotal)}, belum termasuk ongkir.`;
+
+  form.hidden = false;
+  sheet.querySelector("[data-order-done]").hidden = true;
+  sheet.querySelector("[data-order-error]").hidden = true;
+  form.querySelector('[type="submit"]').disabled = false;
+  sheet.showModal();
+}
+
+function showOrderError(text, withWhatsApp) {
+  const el = document.querySelector("[data-order-error]");
+  el.textContent = text;
+  if (withWhatsApp) {
+    const link = document.createElement("a");
+    link.href = waLink(orderMessage(orderLines));
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Pesan lewat WhatsApp";
+    el.append(" ", link);
+  }
+  el.hidden = false;
+  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+async function sendOrder(payload) {
+  const { supabaseUrl, supabaseKey } = window.TETUTI;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/submit_order`, {
+      method: "POST",
+      headers: { apikey: supabaseKey, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const body = await response.json().catch(() => null);
+    if (response.ok && body) return { data: body };
+    // Pesan dari fungsi database (kode P0001) sudah berbahasa Indonesia.
+    return { error: body?.code === "P0001" ? body.message : "Pesanan gagal dikirim." };
+  } catch {
+    return { error: "Tidak tersambung ke server. Periksa internet lalu coba lagi." };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function clearOrderedQty(lines) {
+  lines.forEach(({ product }) => {
+    qtyState[product.id] = 0;
+    const label = document.getElementById(`qty-${product.id}`);
+    if (label) label.textContent = "0";
+    const minus = document.querySelector(`[data-qty="${product.id}"][data-delta="-1"]`);
+    if (minus) minus.disabled = true;
+  });
+  syncCheckout();
+}
+
+function bindOrderSheet() {
+  const sheet = document.getElementById("order-sheet");
+  const form = sheet.querySelector("[data-order-form]");
+  const fields = form.elements;
+  const addressEl = form.querySelector("[data-address]");
+  const done = sheet.querySelector("[data-order-done]");
+
+  const syncAddress = () => {
+    addressEl.hidden = fields.fulfillment.value !== "antar";
+  };
+  form.querySelectorAll('[name="fulfillment"]').forEach((radio) => {
+    radio.addEventListener("change", syncAddress);
+  });
+
+  sheet.querySelectorAll("[data-sheet-close]").forEach((button) => {
+    button.addEventListener("click", () => sheet.close());
+  });
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) sheet.close();
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    sheet.querySelector("[data-order-error]").hidden = true;
+
+    const name = fields.name.value.trim();
+    const phone = normalizePhone(fields.phone.value);
+    const fulfillment = fields.fulfillment.value;
+    const address = fields.address.value.trim();
+
+    if (!name) return showOrderError("Nama wajib diisi.");
+    if (!/^62[0-9]{8,13}$/.test(phone)) {
+      return showOrderError("Nomor WhatsApp tidak valid. Contoh: 0812 3456 7890.");
+    }
+    if (fulfillment === "antar" && !address) {
+      return showOrderError("Alamat wajib diisi untuk pesanan antar.");
+    }
+
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    submit.textContent = "Mengirim…";
+    const result = await sendOrder({
+      customer_name: name,
+      customer_phone: phone,
+      fulfillment,
+      address: fulfillment === "antar" ? address : null,
+      note: fields.note.value.trim() || null,
+      items: orderLines.map((line) => ({ menu_item_id: line.product.id, quantity: line.qty })),
+      website: fields.website.value,
+    });
+    submit.disabled = false;
+    submit.textContent = "Kirim pesanan";
+
+    if (result.error) return showOrderError(result.error, true);
+
+    sheet.querySelector("[data-order-code]").textContent = result.data.code;
+    sheet.querySelector("[data-order-done-total]").textContent =
+      result.data.subtotal == null
+        ? "Harga dan ongkir dikonfirmasi lewat WhatsApp."
+        : `Total sementara ${rupiah.format(result.data.subtotal)}, belum termasuk ongkir.`;
+    sheet.querySelector("[data-order-phone]").textContent = phone.replace(/^62/, "0");
+    form.hidden = true;
+    done.hidden = false;
+    clearOrderedQty(orderLines);
+    fields.note.value = "";
   });
 }
 
@@ -321,6 +474,7 @@ syncNavHeight();
 renderProducts();
 loadPrices();
 bindGrid();
+bindOrderSheet();
 bindWaDock();
 bindNavSpy();
 syncCheckout();

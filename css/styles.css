@@ -543,6 +543,212 @@ h2 {
   white-space: nowrap;
 }
 
+/* Form pesanan: lembar dari bawah di HP, kotak di tengah di layar lebar.
+   Padding ada di isi, bukan di dialog, supaya klik di luar isi berarti klik
+   latar dan menutup form. */
+.order-sheet {
+  width: min(480px, 100%);
+  max-height: min(92vh, 760px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: #fffaf4;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.order-sheet [hidden] {
+  display: none !important;
+}
+
+.order-sheet::backdrop {
+  background: rgba(12, 7, 6, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.order-form,
+.order-done {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-sheet h2 {
+  font-family: "Playfair Display", serif;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(139, 26, 26, 0.08);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.order-lines {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(139, 26, 26, 0.06);
+  font-weight: 600;
+}
+
+.order-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-lines li span:last-child {
+  color: var(--maroon-dark);
+  white-space: nowrap;
+}
+
+.order-total {
+  font-weight: 700;
+  color: var(--maroon-dark);
+}
+
+.order-sheet .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.order-sheet .field input,
+.order-sheet .field textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 14px;
+  border: 1px solid rgba(42, 22, 18, 0.18);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.order-sheet .field input:focus,
+.order-sheet .field textarea:focus,
+.choice input:focus-visible + span {
+  outline: 2px solid var(--maroon);
+  outline-offset: 1px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border: 0;
+}
+
+.choice legend {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.choice label {
+  position: relative;
+}
+
+.choice input {
+  position: absolute;
+  opacity: 0;
+}
+
+.choice span {
+  display: block;
+  padding: 11px;
+  border: 1px solid rgba(42, 22, 18, 0.18);
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.choice input:checked + span {
+  border-color: var(--maroon);
+  background: var(--maroon);
+  color: #fff;
+}
+
+.trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.form-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.form-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fbeceb;
+  color: #a11a1a;
+  font-size: 0.9rem;
+}
+
+.form-error a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.btn-block {
+  width: 100%;
+  padding-block: 14px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.order-code {
+  margin-top: -10px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 620px) {
+  .order-sheet {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: 24px 24px 0 0;
+  }
+}
+
 body.has-checkout .footer {
   padding-bottom: calc(108px + env(safe-area-inset-bottom));
 }

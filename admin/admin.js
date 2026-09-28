@@ -251,7 +251,7 @@ async function loadOrders(seq) {
   const mine = ++listSeq;
   let query = supabase
     .from("order_summaries")
-    .select("id, code, customer_name, fulfillment, requested_at, status, item_count, items_label, total")
+    .select("id, code, source, customer_name, fulfillment, requested_at, status, item_count, items_label, total")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -275,7 +275,7 @@ async function loadOrders(seq) {
       term
         ? "Tidak ada pesanan yang cocok."
         : state.filter === "aktif"
-          ? "Belum ada pesanan aktif. Catat pesanan dari chat WhatsApp lewat tombol di bawah."
+          ? "Belum ada pesanan aktif. Pesanan dari situs muncul di sini; pesanan dari chat bisa dicatat lewat tombol di bawah."
           : `Belum ada pesanan berstatus ${FILTER_LABEL[state.filter]}.`
     }</p>`;
     return;
@@ -300,7 +300,10 @@ function orderCard(order) {
     <a class="order" href="#/pesanan/${esc(order.id)}">
       <span class="row between"><strong>${esc(order.customer_name)}</strong>${statusPill(order.status)}</span>
       <span class="small">${esc(details.join(" · "))}</span>
-      <span class="row between small"><span class="code">${esc(order.code)}</span>${total}</span>
+      <span class="row between small">
+        <span class="row"><span class="code">${esc(order.code)}</span>${order.source === "situs" ? `<span class="tag">Situs</span>` : ""}</span>
+        ${total}
+      </span>
     </a>`;
 }
 
@@ -381,7 +384,7 @@ async function renderDetail(id) {
           : ""
       }
       <p class="small muted">
-        Dicatat ${esc(formatDate(order.created_at))} · status terakhir ${esc(formatDate(order.status_changed_at))}
+        ${order.source === "situs" ? "Masuk dari situs" : "Dicatat admin"} ${esc(formatDate(order.created_at))} · status terakhir ${esc(formatDate(order.status_changed_at))}
       </p>
       <p class="error" data-error hidden></p>
       <div class="sticky-actions">${actionsHtml(order, pos)}</div>
