@@ -46,8 +46,14 @@ const topbar = document.getElementById("topbar");
 const toastEl = document.getElementById("toast");
 const cancelDialog = document.getElementById("cancel-dialog");
 
+const BASE_TITLE = document.title;
+
 const state = {
   signedIn: false,
+  // Pesanan situs yang belum dibuka admin, dan yang sudah pernah terlihat
+  // supaya bunyi hanya untuk yang benar-benar baru.
+  unseen: 0,
+  knownIds: null,
   menu: [],
   filter: "aktif",
   search: "",
@@ -61,6 +67,10 @@ let renderSeq = 0;
 let listSeq = 0;
 let lastMark = 0;
 let toastTimer = 0;
+let audioCtx = null;
+let ordersChannel = null;
+let pollTimer = 0;
+let checkSeq = 0;
 
 // Umum ----------------------------------------------------------------------
 
@@ -143,6 +153,99 @@ async function enterAdmin() {
   topbar.hidden = false;
   await loadMenu();
   route();
+  startWatching();
+}
+
+// Pesanan baru -----------------------------------------------------------------
+
+// Browser baru mengizinkan bunyi setelah halaman disentuh, jadi AudioContext
+// dibuat atau dilanjutkan dari klik/ketukan pertama.
+async function unlockSound() {
+  if (!audioCtx) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    if (!Context) return;
+    audioCtx = new Context();
+    audioCtx.addEventListener("statechange", syncSoundHint);
+  }
+  if (audioCtx.state === "suspended") await audioCtx.resume().catch(() => {});
+  syncSoundHint();
+}
+
+function syncSoundHint() {
+  const supported = Boolean(window.AudioContext || window.webkitAudioContext);
+  document.querySelectorAll("[data-sound-hint]").forEach((el) => {
+    el.hidden = !supported || audioCtx?.state === "running";
+  });
+}
+
+function playChime() {
+  if (audioCtx?.state === "running") {
+    const start = audioCtx.currentTime;
+    [0, 0.18, 0.5, 0.68].forEach((offset, index) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = index % 2 ? 1320 : 880;
+      gain.gain.setValueAtTime(0.0001, start + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, start + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.16);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(start + offset);
+      osc.stop(start + offset + 0.18);
+    });
+  }
+  navigator.vibrate?.([200, 100, 200]);
+}
+
+function syncTitle() {
+  document.title = state.unseen ? `(${state.unseen}) ${BASE_TITLE}` : BASE_TITLE;
+}
+
+async function checkNewOrders() {
+  if (!state.signedIn) return;
+  const mine = ++checkSeq;
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, customer_name")
+    .eq("source", "situs")
+    .is("seen_at", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (mine !== checkSeq || error || !state.signedIn) return;
+
+  const fresh = state.knownIds ? data.filter((order) => !state.knownIds.has(order.id)) : [];
+  state.knownIds = new Set([...(state.knownIds ?? []), ...data.map((order) => order.id)]);
+  state.unseen = data.length;
+  syncTitle();
+
+  if (fresh.length) {
+    playChime();
+    toast(fresh.length === 1 ? `Pesanan baru dari ${fresh[0].customer_name}` : `${fresh.length} pesanan baru masuk`);
+    const path = location.hash.replace(/^#/, "") || "/";
+    if (path === "/") loadOrders(renderSeq);
+  }
+}
+
+// Realtime memberi kabar seketika; pemeriksaan berkala menutup celah saat
+// sambungan putus atau tab sempat tertidur.
+function startWatching() {
+  stopWatching();
+  checkNewOrders();
+  pollTimer = setInterval(checkNewOrders, 60_000);
+  ordersChannel = supabase
+    .channel("pesanan-baru")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => checkNewOrders())
+    .subscribe();
+}
+
+function stopWatching() {
+  clearInterval(pollTimer);
+  if (ordersChannel) {
+    supabase.removeChannel(ordersChannel);
+    ordersChannel = null;
+  }
+  state.knownIds = null;
+  state.unseen = 0;
+  syncTitle();
 }
 
 async function signOut(notice) {
@@ -154,6 +257,7 @@ async function signOut(notice) {
 
 function renderLogin(notice) {
   state.signedIn = false;
+  stopWatching();
   topbar.hidden = true;
   renderSeq += 1;
   app.innerHTML = `
@@ -210,6 +314,9 @@ function renderList() {
   app.innerHTML = `
     <section class="page has-actions">
       ${flashHtml()}
+      <button type="button" class="sound-hint" data-sound-hint hidden>
+        Ketuk di sini untuk menyalakan bunyi pesanan baru
+      </button>
       <h1>Pesanan</h1>
       <input class="input" type="search" data-search placeholder="Cari nama atau kode"
         aria-label="Cari nama atau kode pesanan" value="${esc(state.search)}" />
@@ -224,6 +331,11 @@ function renderList() {
         <a class="btn primary full" href="#/baru">+ Catat pesanan</a>
       </div>
     </section>`;
+  syncSoundHint();
+  app.querySelector("[data-sound-hint]").addEventListener("click", async () => {
+    await unlockSound();
+    playChime();
+  });
 
   let searchTimer = 0;
   app.querySelector("[data-search]").addEventListener("input", (event) => {
@@ -251,7 +363,7 @@ async function loadOrders(seq) {
   const mine = ++listSeq;
   let query = supabase
     .from("order_summaries")
-    .select("id, code, source, customer_name, fulfillment, requested_at, status, item_count, items_label, total")
+    .select("id, code, source, seen_at, customer_name, fulfillment, requested_at, status, item_count, items_label, total")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -296,9 +408,13 @@ function orderCard(order) {
       ? `<strong>${formatRp(order.total)}</strong>`
       : `<span class="muted">${order.item_count ? "Harga belum lengkap" : "Belum ada item"}</span>`;
 
+  const unseen = order.source === "situs" && !order.seen_at;
   return `
-    <a class="order" href="#/pesanan/${esc(order.id)}">
-      <span class="row between"><strong>${esc(order.customer_name)}</strong>${statusPill(order.status)}</span>
+    <a class="order${unseen ? " unseen" : ""}" href="#/pesanan/${esc(order.id)}">
+      <span class="row between">
+        <span class="row"><strong>${esc(order.customer_name)}</strong>${unseen ? `<span class="tag new">Baru masuk</span>` : ""}</span>
+        ${statusPill(order.status)}
+      </span>
       <span class="small">${esc(details.join(" · "))}</span>
       <span class="row between small">
         <span class="row"><span class="code">${esc(order.code)}</span>${order.source === "situs" ? `<span class="tag">Situs</span>` : ""}</span>
@@ -391,6 +507,17 @@ async function renderDetail(id) {
     </section>`;
 
   const errorEl = app.querySelector("[data-error]");
+
+  if (order.source === "situs" && !order.seen_at) {
+    supabase
+      .from("orders")
+      .update({ seen_at: new Date().toISOString() })
+      .eq("id", order.id)
+      .is("seen_at", null)
+      .then(({ error: seenError }) => {
+        if (!seenError) checkNewOrders();
+      });
+  }
 
   app.querySelectorAll("[data-status]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -919,9 +1046,12 @@ document.getElementById("logout").addEventListener("click", () => signOut("Anda 
 
 ["pointerdown", "keydown"].forEach((type) => {
   document.addEventListener(type, noteActivity, { passive: true });
+  document.addEventListener(type, unlockSound, { passive: true });
 });
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) checkIdle();
+  if (document.hidden) return;
+  checkIdle();
+  checkNewOrders();
 });
 setInterval(checkIdle, 60_000);
 

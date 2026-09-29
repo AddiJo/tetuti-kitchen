@@ -1,6 +1,6 @@
 # PRD — Admin Tetuti Kitchen
 
-Status: fase 1 sebagian sudah tayang di `tetuti.my.id/admin` (login, daftar, catat manual, detail, status). Sisa fase 1 — harga dari admin dan pesanan situs yang masuk otomatis — belum dibangun.
+Status: fase 1 tayang di `tetuti.my.id/admin`: login, harga menu, pesanan situs otomatis, catat manual, detail, status. Bunyi pesanan baru menunggu migrasi Realtime.
 
 Situs publik: [tetuti.my.id](https://www.tetuti.my.id/). Empat menu (Sambal Crispy, Paket Hantaran, Nasi Kotak, Sosis Solo). Nomor toko `081284966859`, area Jakarta, antar atau pickup, pre-order.
 
@@ -218,6 +218,7 @@ Hak akses:
 - Data pembeli: nama, WhatsApp, pickup/antar, alamat bila antar, catatan opsional.
 - Menu tanpa harga tetap bisa dipesan dengan tulisan “Harga via WhatsApp”.
 - Dashboard memperbarui sendiri, dengan bunyi dan angka di judul tab.
+- Tidak ada notifikasi ke HP admin (Telegram, WhatsApp, atau web push) untuk saat ini. Pesanan baru hanya terdengar selama halaman admin terbuka. (Keputusan pemilik, 29 Sep 2026.)
 - Catat pesanan manual tetap ada.
 - Admin di `tetuti.my.id/admin`: HTML biasa dengan `supabase-js` dari CDN, tanpa framework, tidak diindeks Google.
 
@@ -227,20 +228,20 @@ Sudah selesai dan tayang: proyek Supabase (Singapore), skema fase 1, akun admin,
 
 Langkah 1 — harga menu:
 
-- [ ] Agen: migrasi kolom harga dan satuan, akses baca menu untuk pengunjung.
-- [ ] Pemilik: jalankan migrasi di SQL Editor.
-- [ ] Agen: halaman Menu di admin, harga tampil di kartu situs.
-- [ ] Uji, lalu pemilik mengisi harga asli, commit, dan push.
+- [x] Agen: migrasi kolom harga dan satuan, akses baca menu untuk pengunjung.
+- [x] Pemilik: jalankan migrasi di SQL Editor.
+- [x] Agen: halaman Menu di admin, harga tampil di kartu situs.
+- [x] Uji, lalu pemilik mengisi harga asli, commit, dan push.
 
 Langkah 2 — pesanan situs otomatis:
 
-- [ ] Agen: migrasi fungsi kirim pesanan (validasi, harga dari database, batas per nomor dan per jam), kolom sumber dan waktu dibuka.
-- [ ] Pemilik: jalankan migrasi.
-- [ ] Agen: form pesanan dan layar terima kasih di situs, penanda sumber di admin.
-- [ ] Uji dari HP sebagai pembeli, lalu commit dan push.
+- [x] Agen: migrasi fungsi kirim pesanan (validasi, harga dari database, batas per nomor dan per jam), kolom sumber dan waktu dibuka.
+- [x] Pemilik: jalankan migrasi.
+- [x] Agen: form pesanan dan layar terima kasih di situs, penanda sumber di admin.
+- [x] Uji dari HP sebagai pembeli, lalu commit dan push. (TK-29092026-01, 29 Sep 2026.)
 
 Langkah 3 — bunyi pesanan baru:
 
-- [ ] Pemilik: nyalakan Realtime untuk tabel `orders` (atau lewat migrasi).
-- [ ] Agen: daftar memperbarui sendiri, bunyi, angka di judul tab, tanda “Baru masuk”.
+- [ ] Pemilik: jalankan migrasi Realtime untuk tabel `orders`.
+- [x] Agen: daftar memperbarui sendiri, bunyi, angka di judul tab, tanda “Baru masuk”.
 - [ ] Uji dengan dua perangkat: pesan dari HP, dengar bunyi di admin.
