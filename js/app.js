@@ -114,7 +114,7 @@ function renderProducts({ live = false } = {}) {
       .join("");
     const media = item.image
       ? `<img src="${esc(item.image)}" alt="${esc(item.name)}">`
-      : `<img class="no-photo" src="assets/logo-cabai.svg" alt="">`;
+      : `<img class="no-photo" src="assets/logo-cabai.png" alt="">`;
     return `
       <article class="card card-${index}${shown ? " is-live" : ""}">
         <div class="card-media">

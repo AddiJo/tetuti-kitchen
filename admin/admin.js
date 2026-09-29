@@ -1096,7 +1096,7 @@ async function renderInvoiceDoc(id) {
       <article class="doc">
         <header class="doc-head">
           <div class="doc-brand">
-            <img src="/assets/logo-cabai.svg" alt="" width="44" height="44" />
+            <img src="/assets/logo-cabai.png" alt="" width="44" height="44" />
             <div>
               <strong>${esc(store.storeName)}</strong>
               ${contact.map((text) => `<span>${esc(text)}</span>`).join("")}
