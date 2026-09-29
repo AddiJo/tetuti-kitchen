@@ -1018,26 +1018,6 @@ async function renderMenu() {
       renderMenu();
     });
   });
-
-  app.querySelectorAll("[data-toggle]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const menu = state.menu.find((entry) => entry.id === button.dataset.toggle);
-      if (!menu) return;
-      const next = !menu.is_active;
-      button.disabled = true;
-      const { error: toggleError } = await supabase
-        .from("menu_items")
-        .update({ is_active: next })
-        .eq("id", menu.id);
-      if (seq !== renderSeq) return;
-      if (toggleError) {
-        state.flash = { tone: "error", text: `${menu.name} gagal diubah. ${errorMessage(toggleError)}` };
-      } else {
-        toast(next ? `${menu.name} tampil di situs` : `${menu.name} disembunyikan dari situs`);
-      }
-      renderMenu();
-    });
-  });
 }
 
 // Nomor urut ditulis ulang 1..n supaya menu dengan nomor sama tetap bisa digeser.
@@ -1067,10 +1047,6 @@ function menuRow(menu, index, list) {
           ${menu.is_active ? "" : `<span class="tag muted-tag">Disembunyikan</span>`}
         </span>
       </a>
-      <button type="button" class="btn small-btn" data-toggle="${esc(menu.id)}"
-        aria-label="${menu.is_active ? "Sembunyikan" : "Tampilkan"} ${esc(menu.name)} di situs">
-        ${menu.is_active ? "Sembunyikan" : "Tampilkan"}
-      </button>
       <span class="move">
         <button type="button" class="icon-btn" data-move="-1" data-id="${esc(menu.id)}"
           aria-label="Naikkan ${esc(menu.name)}" ${index === 0 ? "disabled" : ""}>↑</button>
