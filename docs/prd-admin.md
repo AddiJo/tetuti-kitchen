@@ -286,4 +286,4 @@ Fase 2, langkah 2 — tagihan:
 - [x] Pemilik: jalankan migrasi invoice PDF, push, dan uji kirim tautan PDF ke WhatsApp (29 Sep 2026). Rewrite `/i/…` di produksi meneruskan ke Supabase Storage dengan `noindex`.
 - [ ] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
-- [ ] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push.
+- [x] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push (29 Sep 2026). Header `nosniff` aktif di produksi.
