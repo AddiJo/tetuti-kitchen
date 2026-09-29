@@ -15,6 +15,13 @@ const dateTime = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
+const longDay = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
 export function esc(value) {
@@ -33,6 +40,10 @@ export function priceLabel(price, unit) {
 
 export function formatDate(iso) {
   return iso ? dateTime.format(new Date(iso)) : "";
+}
+
+export function formatDay(iso) {
+  return iso ? longDay.format(new Date(iso)) : "";
 }
 
 // Menerima 0812…, 812…, +62 812…, atau 62812…; hasilnya selalu 62… tanpa spasi.

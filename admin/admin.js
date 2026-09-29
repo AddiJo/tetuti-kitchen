@@ -5,6 +5,7 @@ import {
   errorMessage,
   esc,
   formatDate,
+  formatDay,
   formatRp,
   fromJakartaInput,
   INVOICE_STATUS_LABEL,
@@ -84,6 +85,8 @@ const state = {
   flash: null,
   cancelOrderId: null,
   paidInvoice: null,
+  // Browser memakai judul halaman sebagai nama file saat Simpan sebagai PDF.
+  printTitle: null,
 };
 
 // Setiap render menaikkan nomor ini; hasil fetch yang datang setelah pindah
@@ -758,7 +761,9 @@ function invoiceSection(order, invoices, total) {
   }
 
   const history = cancelled.length
-    ? `<p class="small muted">Tagihan dibatalkan: ${cancelled.map((invoice) => esc(invoice.code)).join(", ")}</p>`
+    ? `<p class="small muted">Tagihan dibatalkan: ${cancelled
+        .map((invoice) => `<a href="#/tagihan/${esc(invoice.id)}">${esc(invoice.code)}</a>`)
+        .join(", ")}</p>`
     : "";
 
   return `
@@ -782,6 +787,7 @@ function activeInvoiceHtml(invoice, order, total) {
         <button class="btn" type="button" data-invoice-redo>Buat ulang tagihan</button>`
       : "";
 
+  const view = `<a class="btn" href="#/tagihan/${esc(invoice.id)}">Lihat invoice</a>`;
   let meta;
   let actions;
   if (invoice.status === "draft") {
@@ -790,17 +796,21 @@ function activeInvoiceHtml(invoice, order, total) {
       <a class="btn primary" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim lewat WhatsApp</a>
       <a class="btn" href="#/pesanan/${esc(order.id)}/tagihan">Ubah</a>
       <button class="btn" type="button" data-invoice-paid>Tandai lunas</button>
+      ${view}
       <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
   } else if (invoice.status === "terkirim") {
     meta = `Dikirim ${esc(formatDate(invoice.sent_at))}. Menunggu pembayaran.`;
     actions = `
       <button class="btn primary" type="button" data-invoice-paid>Tandai lunas</button>
       <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim ulang</a>
+      ${view}
       <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
   } else {
     const differs = invoice.paid_amount !== invoice.total ? ` dari tagihan ${esc(formatRp(invoice.total))}` : "";
     meta = `Diterima ${esc(formatRp(invoice.paid_amount))}${differs} · ${esc(formatDate(invoice.paid_at))}.`;
-    actions = `<button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
+    actions = `
+      ${view}
+      <button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
   }
 
   return `
@@ -1017,6 +1027,139 @@ async function renderInvoiceForm(orderId) {
 
     toast(active ? "Tagihan disimpan" : "Tagihan dibuat. Kirim ke pembeli dari halaman detail.");
     if (seq === renderSeq) location.hash = back;
+  });
+}
+
+// Status yang dibaca pembeli di dokumen; Draft dan Terkirim sama-sama belum dibayar.
+const DOC_STAMP = { draft: "Belum dibayar", terkirim: "Belum dibayar", lunas: "Lunas", batal: "Dibatalkan" };
+
+async function renderInvoiceDoc(id) {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const { data: invoice, error } = await supabase
+    .from("invoices")
+    .select("*, orders(code, customer_name, customer_phone, fulfillment, address, requested_at)")
+    .eq("id", id)
+    .maybeSingle();
+  if (seq !== renderSeq) return;
+  if (error) return renderProblem(errorMessage(error));
+  if (!invoice) return renderProblem("Tagihan tidak ditemukan.");
+
+  const order = invoice.orders;
+  const store = window.TETUTI ?? { storeName: "Tetuti Kitchen" };
+  state.printTitle = `${invoice.code} ${store.storeName}`;
+
+  const contact = [
+    store.siteUrl ? store.siteUrl.replace(/^https?:\/\//, "") : "",
+    store.whatsappNumber ? `WhatsApp ${displayPhone(store.whatsappNumber)}` : "",
+  ].filter(Boolean);
+  const place =
+    order.fulfillment === "antar" ? `Diantar ke ${esc(order.address)}` : "Diambil sendiri (pickup)";
+  const rows = invoice.lines
+    .map(
+      (line) => `
+        <tr>
+          <td>${esc(line.name)}</td>
+          <td class="num">${line.quantity}</td>
+          <td class="num">${esc(formatRp(line.unit_price))}</td>
+          <td class="num">${esc(formatRp(line.quantity * line.unit_price))}</td>
+        </tr>`
+    )
+    .join("");
+  const paid =
+    invoice.status === "lunas"
+      ? `<p class="doc-paid">Diterima ${esc(formatRp(invoice.paid_amount))} pada ${esc(formatDay(invoice.paid_at))}. Terima kasih!</p>`
+      : "";
+
+  app.innerHTML = `
+    <section class="page invoice-page">
+      <div class="no-print stack">
+        <a class="back" href="#/pesanan/${esc(invoice.order_id)}">‹ Detail pesanan</a>
+        ${
+          invoice.status === "draft"
+            ? `<p class="notice">Tagihan masih Draft. Kalau PDF ini dikirim sendiri ke pembeli, tekan Tandai terkirim.</p>`
+            : ""
+        }
+        ${
+          invoice.status === "batal"
+            ? `<p class="notice error">Tagihan ini sudah dibatalkan. Jangan dikirim ke pembeli.</p>`
+            : ""
+        }
+        <div class="row">
+          <button class="btn primary full" type="button" data-print>Cetak / Simpan PDF</button>
+          ${invoice.status === "draft" ? `<button class="btn" type="button" data-mark-sent>Tandai terkirim</button>` : ""}
+        </div>
+        <p class="small muted">Di HP: tekan Cetak, pilih Simpan sebagai PDF, lalu kirim file-nya lewat WhatsApp.</p>
+        <p class="error" data-error hidden></p>
+      </div>
+
+      <article class="doc">
+        <header class="doc-head">
+          <div class="doc-brand">
+            <img src="/assets/logo-cabai.svg" alt="" width="44" height="44" />
+            <div>
+              <strong>${esc(store.storeName)}</strong>
+              ${contact.map((text) => `<span>${esc(text)}</span>`).join("")}
+            </div>
+          </div>
+          <div class="doc-title">
+            <h1>Invoice</h1>
+            <span class="code">${esc(invoice.code)}</span>
+          </div>
+        </header>
+
+        <div class="doc-meta">
+          <div>
+            <span class="label">Kepada</span>
+            <strong>${esc(order.customer_name)}</strong>
+            <span>${esc(displayPhone(order.customer_phone))}</span>
+            <span>${place}</span>
+          </div>
+          <dl>
+            <dt>Tanggal</dt><dd>${esc(formatDay(invoice.created_at))}</dd>
+            <dt>Pesanan</dt><dd>${esc(order.code)}</dd>
+            ${order.requested_at ? `<dt>Jadwal</dt><dd>${esc(formatDate(order.requested_at))}</dd>` : ""}
+            <dt>Status</dt><dd><span class="doc-stamp d-${invoice.status}">${DOC_STAMP[invoice.status]}</span></dd>
+          </dl>
+        </div>
+
+        <table class="doc-items">
+          <thead>
+            <tr><th>Item</th><th class="num">Jml</th><th class="num">Harga</th><th class="num">Jumlah</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr><td colspan="3">Subtotal</td><td class="num">${esc(formatRp(invoice.subtotal))}</td></tr>
+            ${
+              invoice.shipping_fee
+                ? `<tr><td colspan="3">Ongkir</td><td class="num">${esc(formatRp(invoice.shipping_fee))}</td></tr>`
+                : ""
+            }
+            <tr class="grand"><td colspan="3">Total</td><td class="num">${esc(formatRp(invoice.total))}</td></tr>
+          </tfoot>
+        </table>
+
+        <div class="doc-pay">
+          <span class="label">Cara bayar</span>
+          <strong>${esc(METHOD_LABEL[invoice.method])}</strong>
+          ${invoice.instructions ? `<p class="note">${esc(invoice.instructions)}</p>` : ""}
+        </div>
+        ${paid}
+        <p class="doc-foot">Terima kasih sudah memesan di ${esc(store.storeName)}.</p>
+      </article>
+    </section>`;
+
+  const errorEl = app.querySelector("[data-error]");
+  app.querySelector("[data-print]").addEventListener("click", () => window.print());
+  const markSent = app.querySelector("[data-mark-sent]");
+  markSent?.addEventListener("click", async () => {
+    markSent.disabled = true;
+    if (await updateInvoice(invoice.id, { status: "terkirim" }, errorEl)) {
+      toast("Tagihan ditandai terkirim");
+      renderInvoiceDoc(invoice.id);
+    } else {
+      markSent.disabled = false;
+    }
   });
 }
 
@@ -1697,6 +1840,7 @@ function route() {
   const path = location.hash.replace(/^#/, "") || "/";
   const uuid = "([0-9a-f-]{36})";
   let match;
+  state.printTitle = null;
 
   const section = path === "/menu" || path.startsWith("/menu/") ? "menu" : "pesanan";
   topbar.querySelectorAll("[data-nav]").forEach((link) => {
@@ -1712,8 +1856,14 @@ function route() {
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}$`)))) return renderDetail(match[1]);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}/ubah$`)))) return renderForm(match[1]);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}/tagihan$`)))) return renderInvoiceForm(match[1]);
+  if ((match = path.match(new RegExp(`^/tagihan/${uuid}$`)))) return renderInvoiceDoc(match[1]);
   location.hash = "#/";
 }
+
+window.addEventListener("beforeprint", () => {
+  if (state.printTitle) document.title = state.printTitle;
+});
+window.addEventListener("afterprint", syncTitle);
 
 window.addEventListener("hashchange", () => {
   if (state.signedIn) route();
