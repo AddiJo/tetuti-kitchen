@@ -282,5 +282,5 @@ Fase 2, langkah 2 — tagihan:
 - [x] Pemilik: jalankan migrasi tagihan, push, kirim tagihan ke WhatsApp (29 Sep 2026).
 - [x] Agen: kirim invoice sebagai PDF lewat menu Bagikan, teks sebagai cadangan (tanpa migrasi).
 - [x] Agen: kirim tautan PDF langsung ke nomor pembeli (migrasi `20260929050000_invoice_pdf.sql`, rewrite `/i/…` di `vercel.json`).
-- [ ] Pemilik: jalankan migrasi invoice PDF sebelum push.
-- [ ] Pemilik: push, lalu uji Kirim PDF ke WhatsApp ke nomor sendiri, buka tautannya, tandai lunas, dan buka tautan yang sama lagi.
+- [x] Pemilik: jalankan migrasi invoice PDF, push, dan uji kirim tautan PDF ke WhatsApp (29 Sep 2026). Rewrite `/i/…` di produksi meneruskan ke Supabase Storage dengan `noindex`.
+- [ ] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas.
