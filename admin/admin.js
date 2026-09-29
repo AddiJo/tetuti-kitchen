@@ -716,8 +716,9 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
 
 const INVOICE_ELIGIBLE = ["dikonfirmasi", "diproses", "selesai"];
 const PDF_LABEL = { draft: "Kirim PDF ke WhatsApp", terkirim: "Kirim ulang PDF", lunas: "Kirim PDF lunas" };
+const DEFAULT_INSTRUCTIONS = { transfer: "BRI 440701021532539 a.n. Sugiastuti" };
 const INSTRUCTION_HINT = {
-  transfer: "BCA 1234567890 a.n. Nama Pemilik",
+  transfer: DEFAULT_INSTRUCTIONS.transfer,
   qris: "Kode QRIS kami kirim di chat ini.",
   tunai: "Dibayar saat pickup atau saat diantar.",
 };
@@ -1130,7 +1131,7 @@ async function renderInvoiceForm(orderId) {
     shipping_fee: order.shipping_fee,
     total,
     method: "transfer",
-    instructions: null,
+    instructions: DEFAULT_INSTRUCTIONS.transfer,
   };
 
   app.innerHTML = `
@@ -1184,6 +1185,16 @@ async function renderInvoiceForm(orderId) {
     labelEl.textContent = method === "tunai" ? "Instruksi bayar (opsional)" : "Instruksi bayar";
     previewEl.textContent = invoiceMessage({ ...draft, method, instructions }, order);
   };
+  // Rekening bawaan ikut diganti saat cara bayar diganti, kecuali admin sudah
+  // menulis instruksinya sendiri.
+  let lastMethod = draft.method;
+  fields.method.forEach((radio) =>
+    radio.addEventListener("change", () => {
+      const untouched = fields.instructions.value.trim() === (DEFAULT_INSTRUCTIONS[lastMethod] ?? "");
+      if (untouched) fields.instructions.value = DEFAULT_INSTRUCTIONS[radio.value] ?? "";
+      lastMethod = radio.value;
+    })
+  );
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
   sync();
@@ -1196,7 +1207,7 @@ async function renderInvoiceForm(orderId) {
       return showError(
         errorEl,
         values.method === "transfer"
-          ? "Isi rekening tujuan, misalnya BCA 1234567890 a.n. Nama Pemilik."
+          ? `Isi rekening tujuan, misalnya ${DEFAULT_INSTRUCTIONS.transfer}.`
           : "Isi instruksi bayar, misalnya bahwa kode QRIS dikirim di chat."
       );
     }

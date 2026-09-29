@@ -151,7 +151,7 @@ Teks kartu, badge, dan foto pindah dari `js/products.js` ke database. `js/produc
 Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
-- Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
+- Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan. Tagihan baru dengan Transfer langsung terisi rekening bawaan `BRI 440701021532539 a.n. Sugiastuti` dan tetap bisa diubah. Pindah cara bayar ikut mengganti rekening bawaan, tapi tidak menimpa instruksi yang sudah ditulis admin. (Permintaan pemilik, 29 Sep 2026.)
 - Kirim tagihan: file PDF invoice dikirim ke WhatsApp pembeli. (Keputusan pemilik, 29 Sep 2026.)
 - Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci, kecuali lewat Batalkan lunas (dengan konfirmasi) yang mengembalikannya ke Terkirim untuk memperbaiki salah tandai. (Keputusan pemilik, 29 Sep 2026.)
 
