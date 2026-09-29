@@ -1,6 +1,6 @@
 # PRD — Admin Tetuti Kitchen
 
-Status: fase 1 tayang di `tetuti.my.id/admin`: login, harga menu, pesanan situs otomatis, catat manual, detail, status. Bunyi pesanan baru menunggu migrasi Realtime.
+Status: fase 1 tayang di `tetuti.my.id/admin`: login, harga menu, pesanan situs otomatis, catat manual, detail, status. Bunyi pesanan baru menunggu migrasi Realtime. Fase 2 kelola menu sudah dibangun dan menunggu migrasi `20260929020000_kelola_menu.sql`.
 
 Situs publik: [tetuti.my.id](https://www.tetuti.my.id/). Empat menu (Sambal Crispy, Paket Hantaran, Nasi Kotak, Sosis Solo). Nomor toko `081284966859`, area Jakarta, antar atau pickup, pre-order.
 
@@ -137,11 +137,13 @@ Login memakai Supabase Auth dengan email dan sandi.
 
 ### Kelola menu
 
-Teks kartu, badge, dan foto pindah dari `js/products.js` ke database.
+Teks kartu, badge, dan foto pindah dari `js/products.js` ke database. `js/products.js` tinggal jadi cadangan yang tampil kalau database tidak bisa dihubungi.
 
-- Tambah menu: nama, kategori (camilan, hantaran, catering), badge, kalimat singkat, deskripsi, tiga sorotan, harga, satuan.
-- Upload foto: JPG atau PNG. Foto yang gagal diunggah tidak menghapus foto lama.
+- Tambah menu: nama, kategori (camilan, hantaran, catering), badge, kalimat singkat, deskripsi, tiga sorotan, harga, satuan. Hanya nama yang wajib. Nama menjadi alamat tetap menu (`sambal-crispy`); mengganti nama kemudian tidak mengubah alamat itu.
+- Upload foto: JPG atau PNG. Admin mengecilkan foto ke sisi terpanjang 1200 px dan mengubahnya ke JPG sebelum diunggah ke bucket `menu-foto`. Foto baru diunggah dulu; menu baru disimpan kalau unggahan berhasil, lalu foto lama dihapus. Foto yang gagal diunggah tidak menghapus foto lama.
 - Sembunyikan menu: hilang dari situs, pesanan lama tetap menampilkan namanya.
+- Urutan: tombol naik/turun di daftar menu, sama dengan urutan kartu di situs.
+- Harga diubah dari halaman ubah menu (dulu satu halaman harga untuk semua menu).
 
 ### Buat tagihan bayar
 
@@ -150,7 +152,7 @@ Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
 - Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
 - Kirim tagihan: membuka WhatsApp ke nomor pembeli dengan teks item, total, cara bayar, dan kode tagihan.
-- Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci.
+- Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci, kecuali lewat Batalkan lunas (dengan konfirmasi) yang mengembalikannya ke Terkirim untuk memperbaiki salah tandai. (Keputusan pemilik, 29 Sep 2026.)
 
 Status tagihan: Draft, Terkirim, Lunas, Batal.
 
@@ -190,7 +192,7 @@ Pesanan batal tidak dihitung. Omzet dari tagihan lunas. Hari ini mengikuti zona 
 Backend: Supabase (Postgres, Auth, Realtime, Storage) di region Singapore. Skema fase 1 ada di `supabase/migrations/`. Sketsa layar di `docs/wireframe-fase1.html`.
 
 - Akun: Supabase Auth. Tabel `admins` menandai akun admin.
-- Menu: identitas, nama, kategori, harga, satuan, aktif, urutan. Teks kartu dan foto menyusul di fase 2.
+- Menu: identitas, nama, kategori, harga, satuan, aktif, urutan, badge, kalimat singkat, deskripsi, sorotan, foto. Foto hanya boleh dari folder `assets/` situs atau bucket `menu-foto` proyek ini.
 - Pesanan: kode, sumber (situs/admin), pembeli, antar/pickup, alamat, catatan, item dengan harga saat dipesan, ongkir, status, alasan batal, waktu dibuat, waktu status terakhir, waktu pertama dibuka admin.
 - Tagihan (fase 2), toko (fase 4).
 
@@ -198,7 +200,7 @@ Kode pesanan `TK-DDMMYYYY-NN`: tanggal Jakarta plus urutan harian, sama untuk pe
 
 Hak akses:
 
-- Pengunjung tanpa login: hanya membaca nama dan harga menu aktif, dan mengirim pesanan lewat satu fungsi database yang memeriksa semua aturan di atas. Tidak bisa membaca atau mengubah tabel lain.
+- Pengunjung tanpa login: hanya membaca isi kartu menu aktif (nama, harga, teks, foto), dan mengirim pesanan lewat satu fungsi database yang memeriksa semua aturan di atas. Tidak bisa membaca atau mengubah tabel lain, dan tidak bisa mengunggah, menghapus, atau melihat daftar foto.
 - Admin: membaca dan mengubah semuanya lewat aturan RLS.
 
 ## Ukuran berhasil
@@ -246,3 +248,11 @@ Langkah 3 — bunyi pesanan baru:
 - [ ] Pemilik: jalankan migrasi Realtime untuk tabel `orders`.
 - [x] Agen: daftar memperbarui sendiri, bunyi, angka di judul tab, tanda “Baru masuk”.
 - [ ] Uji dengan dua perangkat: pesan dari HP, dengar bunyi di admin.
+
+Fase 2, langkah 1 — kelola menu:
+
+- [x] Agen: migrasi teks kartu, foto, bucket `menu-foto` dan aksesnya; halaman daftar, tambah, dan ubah menu; situs membaca kartu dari database.
+- [ ] Pemilik: jalankan migrasi `20260929020000_kelola_menu.sql` **sebelum** push. Kalau kode tayang lebih dulu, situs jatuh ke kartu cadangan dan harga tertulis “Harga via WhatsApp” sampai migrasi dijalankan.
+- [ ] Pemilik: push, lalu uji ganti foto satu menu dan tambah satu menu uji (sembunyikan lagi setelahnya).
+
+Fase 2, langkah 2 — tagihan: dikerjakan setelah kelola menu, mengikuti urutan fase (keputusan pemilik, 29 Sep 2026). Sumber instruksi bayar belum diputuskan.

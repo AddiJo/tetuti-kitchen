@@ -3,6 +3,19 @@ import { animate, inView, stagger, hover } from "https://cdn.jsdelivr.net/npm/mo
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const easeOut = [0.22, 1, 0.36, 1];
 
+// hover() hanya menempel ke elemen yang sudah ada saat dipanggil.
+function bindHover(scope) {
+  hover(`${scope}.card`, (el) => {
+    animate(el, { y: -10 }, { type: "spring", stiffness: 320, damping: 22 });
+    return () => animate(el, { y: 0 }, { type: "spring", stiffness: 280, damping: 24 });
+  });
+
+  hover(`${scope}.btn`, (el) => {
+    animate(el, { scale: 1.04 }, { duration: 0.18 });
+    return () => animate(el, { scale: 1 }, { duration: 0.18 });
+  });
+}
+
 function play() {
   if (reduced) {
     document.documentElement.classList.remove("js-motion");
@@ -50,14 +63,14 @@ function play() {
   );
 
   try {
-    hover(".card", (el) => {
-      animate(el, { y: -10 }, { type: "spring", stiffness: 320, damping: 22 });
-      return () => animate(el, { y: 0 }, { type: "spring", stiffness: 280, damping: 24 });
-    });
-
-    hover(".btn", (el) => {
-      animate(el, { scale: 1.04 }, { duration: 0.18 });
-      return () => animate(el, { scale: 1 }, { duration: 0.18 });
+    bindHover("");
+    // Kartu menu digambar ulang setelah isi database termuat.
+    document.addEventListener("tetuti:cards", () => {
+      try {
+        bindHover("#product-grid ");
+      } catch (err) {
+        console.warn("Motion hover skipped", err);
+      }
     });
   } catch (err) {
     console.warn("Motion hover skipped", err);

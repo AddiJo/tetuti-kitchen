@@ -78,7 +78,41 @@ const CONSTRAINT_MESSAGES = {
   order_items_name_check: "Nama item wajib diisi.",
   menu_items_price_check: "Harga menu harus antara Rp1 dan Rp100.000.000.",
   menu_items_unit_check: "Satuan maksimal 20 karakter.",
+  menu_items_pkey: "Sudah ada menu dengan nama mirip. Pakai nama lain.",
+  menu_items_id_format: "Nama menu harus mengandung huruf atau angka.",
+  menu_items_name_check: "Nama menu wajib diisi.",
+  menu_items_name_length: "Nama menu maksimal 60 karakter.",
+  menu_items_badge_check: "Label foto maksimal 20 karakter.",
+  menu_items_hook_check: "Kalimat singkat maksimal 60 karakter.",
+  menu_items_description_check: "Deskripsi maksimal 300 karakter.",
+  menu_items_highlights_check: "Sorotan maksimal 3, masing-masing maksimal 60 karakter.",
+  menu_items_image_url_check: "Alamat foto tidak dikenali. Unggah ulang fotonya.",
 };
+
+// Nama menu menjadi alamat tetap menu itu, misalnya "Sambal Crispy" -> "sambal-crispy".
+export function slugify(name) {
+  return String(name ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50)
+    .replace(/-+$/, "");
+}
+
+export function uniqueSlug(name, taken) {
+  const base = slugify(name) || "menu";
+  let slug = base;
+  for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
+  return slug;
+}
+
+// Foto bawaan tersimpan sebagai "assets/…" relatif terhadap situs.
+export function menuImageSrc(url) {
+  if (!url) return "";
+  return url.startsWith("assets/") ? `/${url}` : url;
+}
 
 export function errorMessage(error) {
   if (!error) return "Terjadi kesalahan.";
@@ -89,6 +123,7 @@ export function errorMessage(error) {
   // Pesan dari trigger database sudah berbahasa Indonesia.
   if (error.code === "P0001") return message;
   if (error.code === "PGRST301" || /jwt/i.test(message)) return "Sesi habis. Silakan masuk lagi.";
+  if (/row-level security/i.test(message)) return "Akses ditolak. Keluar lalu masuk lagi dengan akun admin.";
   if (/failed to fetch|networkerror|load failed/i.test(message)) {
     return "Tidak tersambung ke server. Periksa internet lalu coba lagi.";
   }

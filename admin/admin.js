@@ -9,10 +9,12 @@ import {
   fromJakartaInput,
   isValidPhone,
   loginErrorMessage,
+  menuImageSrc,
   normalizePhone,
   parseRupiah,
   priceLabel,
   toJakartaInput,
+  uniqueSlug,
 } from "./lib.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -158,8 +160,9 @@ async function confirmAdmin() {
 async function loadMenu() {
   const { data, error } = await supabase
     .from("menu_items")
-    .select("id, name, is_active, price, unit")
-    .order("sort_order");
+    .select("id, name, category, is_active, price, unit, sort_order, badge, hook, description, highlights, image_url")
+    .order("sort_order")
+    .order("name");
   if (error) toast(`Menu gagal dimuat. ${errorMessage(error)}`);
   else state.menu = data;
   return error;
@@ -961,7 +964,12 @@ async function updateOrder(id, values, items, original) {
   return { id };
 }
 
-// Menu dan harga ---------------------------------------------------------------
+// Menu -------------------------------------------------------------------------
+
+const PHOTO_BUCKET = "menu-foto";
+const PHOTO_MAX_PX = 1200;
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const CATEGORY_LABEL = { camilan: "Camilan", hantaran: "Hantaran", catering: "Catering" };
 
 async function renderMenu() {
   const seq = ++renderSeq;
@@ -971,92 +979,325 @@ async function renderMenu() {
   if (error) return renderProblem(errorMessage(error));
 
   app.innerHTML = `
-    <section class="page has-actions">
+    <section class="page">
       ${flashHtml()}
-      <h1>Menu &amp; harga</h1>
+      <div class="row between">
+        <h1>Menu</h1>
+        <a class="btn primary" href="#/menu/baru">+ Tambah menu</a>
+      </div>
       <p class="small muted">
-        Harga tampil di kartu situs. Kosongkan harga kalau situs cukup menulis “Harga via WhatsApp”.
-        Pesanan yang sudah masuk tidak ikut berubah.
+        Urutan di sini sama dengan urutan kartu di situs. Menu yang disembunyikan tidak tampil di situs,
+        tapi tetap tercatat di pesanan lama.
       </p>
+      <div class="list">
+        ${
+          state.menu.length
+            ? state.menu.map(menuRow).join("")
+            : `<p class="empty">Belum ada menu. Tambahkan menu pertama.</p>`
+        }
+      </div>
+    </section>`;
+
+  app.querySelectorAll("[data-move]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const from = state.menu.findIndex((menu) => menu.id === button.dataset.id);
+      const to = from + Number(button.dataset.move);
+      if (from < 0 || to < 0 || to >= state.menu.length) return;
+
+      const ordered = state.menu.slice();
+      [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+      app.querySelectorAll("[data-move]").forEach((el) => {
+        el.disabled = true;
+      });
+      const moveError = await saveMenuOrder(ordered);
+      if (seq !== renderSeq) return;
+      if (moveError) {
+        await loadMenu();
+        state.flash = { tone: "error", text: `Urutan gagal disimpan. ${errorMessage(moveError)}` };
+      }
+      renderMenu();
+    });
+  });
+}
+
+// Nomor urut ditulis ulang 1..n supaya menu dengan nomor sama tetap bisa digeser.
+async function saveMenuOrder(ordered) {
+  for (const [index, menu] of ordered.entries()) {
+    if (menu.sort_order === index + 1) continue;
+    const { error } = await supabase.from("menu_items").update({ sort_order: index + 1 }).eq("id", menu.id);
+    if (error) return error;
+    menu.sort_order = index + 1;
+  }
+  return null;
+}
+
+function menuRow(menu, index, list) {
+  const src = menuImageSrc(menu.image_url);
+  return `
+    <div class="menu-row${menu.is_active ? "" : " is-hidden"}">
+      <a class="menu-link" href="#/menu/${esc(menu.id)}">
+        ${
+          src
+            ? `<img class="thumb" src="${esc(src)}" alt="" loading="lazy" />`
+            : `<span class="thumb empty-thumb" aria-hidden="true"></span>`
+        }
+        <span class="menu-text">
+          <strong>${esc(menu.name)}</strong>
+          <span class="small muted">${esc(priceLabel(menu.price, menu.unit))} · ${esc(CATEGORY_LABEL[menu.category])}</span>
+          ${menu.is_active ? "" : `<span class="tag muted-tag">Disembunyikan</span>`}
+        </span>
+      </a>
+      <span class="move">
+        <button type="button" class="icon-btn" data-move="-1" data-id="${esc(menu.id)}"
+          aria-label="Naikkan ${esc(menu.name)}" ${index === 0 ? "disabled" : ""}>↑</button>
+        <button type="button" class="icon-btn" data-move="1" data-id="${esc(menu.id)}"
+          aria-label="Turunkan ${esc(menu.name)}" ${index === list.length - 1 ? "disabled" : ""}>↓</button>
+      </span>
+    </div>`;
+}
+
+// Foto dari HP bisa belasan MB. Dikecilkan dan dijadikan JPG sebelum diunggah;
+// bagian transparan PNG diisi warna latar kartu situs.
+async function preparePhoto(file) {
+  if (!/^image\/(jpeg|png)$/.test(file.type)) throw new Error("Pilih foto berformat JPG atau PNG.");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode().catch(() => {
+      throw new Error("Foto tidak bisa dibaca. Coba foto lain.");
+    });
+    const scale = Math.min(1, PHOTO_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ead9c8";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.85, 0.7, 0.55]) {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (blob && blob.size <= PHOTO_MAX_BYTES) return blob;
+    }
+    throw new Error("Foto terlalu besar. Coba foto lain.");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function photoPath(url) {
+  const prefix = supabase.storage.from(PHOTO_BUCKET).getPublicUrl("").data.publicUrl;
+  return url?.startsWith(prefix) ? url.slice(prefix.length) : null;
+}
+
+async function renderMenuForm(id) {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const loadError = await loadMenu();
+  if (seq !== renderSeq) return;
+  if (loadError) return renderProblem(errorMessage(loadError), "#/menu");
+
+  const menu = id ? state.menu.find((entry) => entry.id === id) : null;
+  if (id && !menu) return renderProblem("Menu tidak ditemukan.", "#/menu");
+  const highlights = [0, 1, 2].map((index) => menu?.highlights?.[index] ?? "");
+
+  app.innerHTML = `
+    <section class="page has-actions">
+      <a class="back" href="#/menu">‹ Menu</a>
+      <h1>${menu ? esc(menu.name) : "Menu baru"}</h1>
       <form id="menu-form" class="stack" novalidate>
-        ${state.menu.map(menuRow).join("")}
+        <div class="photo-field">
+          <div class="photo-frame">
+            <img data-photo-preview alt="" hidden />
+            <span class="muted small" data-photo-empty>Belum ada foto</span>
+          </div>
+          <div class="stack">
+            <label class="btn photo-btn">
+              <input class="sr-only" type="file" accept="image/jpeg,image/png" data-photo />
+              <span data-photo-label>Pilih foto</span>
+            </label>
+            <span class="small muted">JPG atau PNG. Foto tegak 3:4 paling pas di kartu situs.</span>
+          </div>
+        </div>
+        <label class="field">
+          <span>Nama menu</span>
+          <input class="input" name="name" maxlength="60" autocomplete="off" required />
+        </label>
+        <label class="field">
+          <span>Kategori</span>
+          <select class="input" name="category">
+            ${Object.entries(CATEGORY_LABEL)
+              .map(([value, label]) => `<option value="${value}">${label}</option>`)
+              .join("")}
+          </select>
+        </label>
+        <div class="menu-fields">
+          <label class="field">
+            <span>Harga</span>
+            <input class="input" name="price" inputmode="numeric" placeholder="Kosong" />
+          </label>
+          <label class="field">
+            <span>Satuan (opsional)</span>
+            <input class="input" name="unit" maxlength="20" placeholder="pack, box, porsi" />
+          </label>
+        </div>
+        <span class="small muted">Di situs: <span data-preview></span></span>
+        <label class="field">
+          <span>Label di foto (opsional)</span>
+          <input class="input" name="badge" maxlength="20" placeholder="Best seller, Baru, Hampers" />
+        </label>
+        <label class="field">
+          <span>Kalimat singkat (opsional)</span>
+          <input class="input" name="hook" maxlength="60" placeholder="Pedas, renyah, nagih!" />
+        </label>
+        <label class="field">
+          <span>Deskripsi (opsional)</span>
+          <textarea class="input" name="description" rows="3" maxlength="300"></textarea>
+        </label>
+        <fieldset class="box">
+          <legend class="label">Sorotan (opsional, maksimal 3)</legend>
+          ${highlights
+            .map(
+              (_, index) =>
+                `<input class="input" name="highlight" maxlength="60" aria-label="Sorotan ${index + 1}" />`
+            )
+            .join("")}
+        </fieldset>
+        <label class="check">
+          <input type="checkbox" name="is_active" />
+          <span>Tampilkan di situs</span>
+        </label>
         <p class="error" data-error hidden></p>
         <div class="sticky-actions">
-          <button class="btn primary full" type="submit">Simpan harga</button>
+          <button class="btn primary full" type="submit">${menu ? "Simpan perubahan" : "Tambah menu"}</button>
         </div>
       </form>
     </section>`;
 
   const form = app.querySelector("#menu-form");
+  const fields = form.elements;
   const errorEl = form.querySelector("[data-error]");
-  const rows = [...form.querySelectorAll("[data-menu]")];
-  const readRow = (row) => ({
-    id: row.dataset.menu,
-    price: parseRupiah(row.querySelector('[name="price"]').value),
-    unit: row.querySelector('[name="unit"]').value.trim() || null,
-  });
+  const previewEl = form.querySelector("[data-preview]");
+  const photoInput = form.querySelector("[data-photo]");
+  const photoImg = form.querySelector("[data-photo-preview]");
+  const photoEmpty = form.querySelector("[data-photo-empty]");
+  const photoLabel = form.querySelector("[data-photo-label]");
+  let photoBlob = null;
+  let photoUrl = null;
 
-  form.addEventListener("input", (event) => {
-    const row = event.target.closest("[data-menu]");
-    if (!row) return;
-    const { price, unit } = readRow(row);
-    row.querySelector("[data-preview]").textContent = priceLabel(price, unit);
+  fields.name.value = menu?.name ?? "";
+  fields.category.value = menu?.category ?? "camilan";
+  fields.price.value = menu?.price ?? "";
+  fields.unit.value = menu?.unit ?? "";
+  fields.badge.value = menu?.badge ?? "";
+  fields.hook.value = menu?.hook ?? "";
+  fields.description.value = menu?.description ?? "";
+  form.querySelectorAll('[name="highlight"]').forEach((input, index) => {
+    input.value = highlights[index];
+  });
+  fields.is_active.checked = menu ? menu.is_active : true;
+
+  const showPhoto = (src) => {
+    photoImg.hidden = !src;
+    photoEmpty.hidden = Boolean(src);
+    if (src) photoImg.src = src;
+    photoLabel.textContent = src ? "Ganti foto" : "Pilih foto";
+  };
+  showPhoto(menuImageSrc(menu?.image_url));
+
+  const syncPreview = () => {
+    previewEl.textContent = priceLabel(parseRupiah(fields.price.value), fields.unit.value.trim() || null);
+  };
+  syncPreview();
+  fields.price.addEventListener("input", syncPreview);
+  fields.unit.addEventListener("input", syncPreview);
+
+  photoInput.addEventListener("change", async () => {
+    const file = photoInput.files[0];
+    photoInput.value = "";
+    if (!file) return;
+    errorEl.hidden = true;
+    photoLabel.textContent = "Menyiapkan foto…";
+    try {
+      photoBlob = await preparePhoto(file);
+    } catch (problem) {
+      showPhoto(photoUrl || menuImageSrc(menu?.image_url));
+      return showError(errorEl, problem.message);
+    }
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    photoUrl = URL.createObjectURL(photoBlob);
+    showPhoto(photoUrl);
   });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     errorEl.hidden = true;
 
-    const values = rows.map(readRow);
-    const invalid = values.find((value) => value.price != null && (value.price < 1 || value.price > 100_000_000));
-    if (invalid) {
-      const name = state.menu.find((menu) => menu.id === invalid.id).name;
-      return showError(errorEl, `Harga ${name} harus antara Rp1 dan Rp100.000.000. Kosongkan kalau belum ada harga.`);
+    const values = {
+      name: fields.name.value.trim(),
+      category: fields.category.value,
+      price: parseRupiah(fields.price.value),
+      unit: fields.unit.value.trim() || null,
+      badge: fields.badge.value.trim() || null,
+      hook: fields.hook.value.trim() || null,
+      description: fields.description.value.trim() || null,
+      highlights: [...form.querySelectorAll('[name="highlight"]')]
+        .map((input) => input.value.trim())
+        .filter(Boolean),
+      is_active: fields.is_active.checked,
+    };
+
+    if (!values.name) return showError(errorEl, "Nama menu wajib diisi.");
+    if (values.price != null && (values.price < 1 || values.price > 100_000_000)) {
+      return showError(errorEl, "Harga harus antara Rp1 dan Rp100.000.000. Kosongkan kalau belum ada harga.");
     }
 
-    const changed = values.filter((value) => {
-      const menu = state.menu.find((entry) => entry.id === value.id);
-      return menu.price !== value.price || menu.unit !== value.unit;
-    });
-    if (changed.length === 0) return toast("Tidak ada perubahan");
-
+    const taken = new Set(state.menu.map((entry) => entry.id));
+    taken.add("baru");
+    const menuId = menu ? menu.id : uniqueSlug(values.name, taken);
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
-    for (const { id, price, unit } of changed) {
-      const { error: updateError } = await supabase.from("menu_items").update({ price, unit }).eq("id", id);
-      if (updateError) {
-        submit.disabled = false;
-        const partial = changed.length > 1 ? " Menu lain mungkin sudah tersimpan; muat ulang untuk memeriksa." : "";
-        return showError(errorEl, errorMessage(updateError) + partial);
-      }
-    }
-    await loadMenu();
-    toast("Harga disimpan");
-    if (seq === renderSeq) location.hash = "#/";
-  });
-}
 
-function menuRow(menu) {
-  return `
-    <div class="card" data-menu="${esc(menu.id)}">
-      <div class="row between">
-        <strong>${esc(menu.name)}</strong>
-        ${menu.is_active ? "" : `<span class="small muted">Disembunyikan</span>`}
-      </div>
-      <div class="menu-fields">
-        <label class="field">
-          <span>Harga</span>
-          <input class="input" name="price" inputmode="numeric" placeholder="Kosong"
-            value="${esc(menu.price ?? "")}" />
-        </label>
-        <label class="field">
-          <span>Satuan (opsional)</span>
-          <input class="input" name="unit" maxlength="20" placeholder="pack, box, porsi"
-            value="${esc(menu.unit ?? "")}" />
-        </label>
-      </div>
-      <span class="small muted">Di situs: <span data-preview>${esc(priceLabel(menu.price, menu.unit))}</span></span>
-    </div>`;
+    let uploaded = null;
+    if (photoBlob) {
+      submit.textContent = "Mengunggah foto…";
+      const path = `${menuId}-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, photoBlob, { contentType: "image/jpeg", cacheControl: "31536000" });
+      if (uploadError) {
+        submit.disabled = false;
+        submit.textContent = menu ? "Simpan perubahan" : "Tambah menu";
+        return showError(errorEl, `Foto gagal diunggah, menu belum disimpan. ${errorMessage(uploadError)}`);
+      }
+      uploaded = path;
+      values.image_url = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+
+    submit.textContent = "Menyimpan…";
+    const { error } = menu
+      ? await supabase.from("menu_items").update(values).eq("id", menu.id)
+      : await supabase.from("menu_items").insert({
+          ...values,
+          id: menuId,
+          sort_order: Math.max(0, ...state.menu.map((entry) => entry.sort_order)) + 1,
+        });
+
+    if (error) {
+      if (uploaded) await supabase.storage.from(PHOTO_BUCKET).remove([uploaded]);
+      submit.disabled = false;
+      submit.textContent = menu ? "Simpan perubahan" : "Tambah menu";
+      return showError(errorEl, errorMessage(error));
+    }
+
+    const oldPath = uploaded ? photoPath(menu?.image_url) : null;
+    if (oldPath) await supabase.storage.from(PHOTO_BUCKET).remove([oldPath]);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+
+    await loadMenu();
+    toast(menu ? "Menu disimpan" : "Menu ditambahkan");
+    if (seq === renderSeq) location.hash = "#/menu";
+  });
 }
 
 // Rute -----------------------------------------------------------------------
@@ -1067,7 +1308,7 @@ function route() {
   const uuid = "([0-9a-f-]{36})";
   let match;
 
-  const section = path === "/menu" ? "menu" : "pesanan";
+  const section = path === "/menu" || path.startsWith("/menu/") ? "menu" : "pesanan";
   topbar.querySelectorAll("[data-nav]").forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -1075,6 +1316,8 @@ function route() {
 
   if (path === "/") return renderList();
   if (path === "/menu") return renderMenu();
+  if (path === "/menu/baru") return renderMenuForm(null);
+  if ((match = path.match(/^\/menu\/([a-z0-9-]+)$/))) return renderMenuForm(match[1]);
   if (path === "/baru") return renderForm(null);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}$`)))) return renderDetail(match[1]);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}/ubah$`)))) return renderForm(match[1]);

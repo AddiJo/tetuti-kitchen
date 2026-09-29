@@ -1,12 +1,20 @@
 const qtyState = {};
 const priceState = {};
 let heroInView = true;
+// Isi awal dari js/products.js; diganti isi database begitu termuat.
+let products = window.TETUTI_PRODUCTS.slice();
 
 const rupiah = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
   maximumFractionDigits: 0,
 });
+
+const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]);
+}
 
 // Sama dengan pratinjau harga di halaman admin (admin/lib.js).
 function priceLabel(id) {
@@ -16,24 +24,43 @@ function priceLabel(id) {
   return entry.unit ? `${amount} / ${entry.unit}` : amount;
 }
 
-// Kalau Supabase lambat atau gagal, kartu tetap menulis "Harga via WhatsApp".
-async function loadPrices() {
+const MENU_COLUMNS = "id,name,category,badge,hook,description,highlights,image_url,price,unit";
+
+// Kalau Supabase lambat atau gagal, kartu dari js/products.js tetap tampil
+// dengan tulisan "Harga via WhatsApp".
+async function loadMenu() {
   const { supabaseUrl, supabaseKey } = window.TETUTI;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/menu_items?select=id,price,unit`, {
-      headers: { apikey: supabaseKey },
-      signal: controller.signal,
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/menu_items?select=${MENU_COLUMNS}&order=sort_order,name`,
+      { headers: { apikey: supabaseKey }, signal: controller.signal }
+    );
+    if (!response.ok) return;
+    const rows = await response.json();
+    products = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      badge: row.badge,
+      hook: row.hook,
+      desc: row.description,
+      highlights: row.highlights,
+      image: row.image_url,
+    }));
+    rows.forEach((row) => {
+      priceState[row.id] = { price: row.price, unit: row.unit };
     });
-    if (response.ok) {
-      for (const row of await response.json()) priceState[row.id] = row;
-    }
+    renderProducts({ live: true });
+    document.dispatchEvent(new CustomEvent("tetuti:cards"));
+    injectStructuredData();
+    syncCheckout();
   } catch {
-    // Tetap dengan harga via WhatsApp.
+    // Tetap dengan kartu bawaan.
   } finally {
     clearTimeout(timer);
-    document.querySelectorAll("[data-price]").forEach((el) => {
+    document.querySelectorAll("[data-price].is-loading").forEach((el) => {
       el.textContent = priceLabel(el.dataset.price);
       el.classList.remove("is-loading");
     });
@@ -46,7 +73,7 @@ function waLink(text) {
 }
 
 function cartLines() {
-  return window.TETUTI_PRODUCTS.map((product) => ({
+  return products.map((product) => ({
     product,
     qty: qtyState[product.id] || 0,
   })).filter((line) => line.qty > 0);
@@ -67,32 +94,46 @@ function orderMessage(lines) {
   ].join("\n");
 }
 
-function renderProducts() {
+function renderProducts({ live = false } = {}) {
   const root = document.getElementById("product-grid");
-  root.innerHTML = window.TETUTI_PRODUCTS.map((item, index) => {
+  // Animasi masuk kartu hanya jalan sekali. Kartu pengganti yang datang
+  // sesudahnya langsung ditampilkan supaya tidak tertahan transparan.
+  const first = root.querySelector(".card");
+  const shown = Boolean(first) && getComputedStyle(first).opacity !== "0";
+
+  if (products.length === 0) {
+    root.innerHTML = `<p class="grid-empty">Menu sedang disiapkan. Tanya menu hari ini lewat WhatsApp.</p>`;
+    return;
+  }
+
+  root.innerHTML = products.map((item, index) => {
     const qty = qtyState[item.id] || 0;
+    const id = esc(item.id);
     const points = (item.highlights || [])
-      .map((line) => `<li>${line}</li>`)
+      .map((line) => `<li>${esc(line)}</li>`)
       .join("");
+    const media = item.image
+      ? `<img src="${esc(item.image)}" alt="${esc(item.name)}">`
+      : `<img class="no-photo" src="assets/logo-cabai.svg" alt="">`;
     return `
-      <article class="card card-${index}">
+      <article class="card card-${index}${shown ? " is-live" : ""}">
         <div class="card-media">
-          <span class="badge">${item.badge}</span>
-          <img src="${item.image}" alt="${item.name}">
+          ${item.badge ? `<span class="badge">${esc(item.badge)}</span>` : ""}
+          ${media}
         </div>
         <div class="card-body">
-          <p class="hook">${item.hook}</p>
-          <h3>${item.name}</h3>
-          <p>${item.desc}</p>
-          <ul class="highlights">${points}</ul>
-          <div class="price is-loading" data-price="${item.id}">Harga via WhatsApp</div>
+          ${item.hook ? `<p class="hook">${esc(item.hook)}</p>` : ""}
+          <h3>${esc(item.name)}</h3>
+          ${item.desc ? `<p>${esc(item.desc)}</p>` : ""}
+          ${points ? `<ul class="highlights">${points}</ul>` : ""}
+          <div class="price${live ? "" : " is-loading"}" data-price="${id}">${esc(priceLabel(item.id))}</div>
           <div class="card-actions">
             <div class="qty">
-              <button type="button" data-qty="${item.id}" data-delta="-1" aria-label="Kurangi" ${qty === 0 ? "disabled" : ""}>−</button>
-              <span id="qty-${item.id}">${qty}</span>
-              <button type="button" data-qty="${item.id}" data-delta="1" aria-label="Tambah">+</button>
+              <button type="button" data-qty="${id}" data-delta="-1" aria-label="Kurangi" ${qty === 0 ? "disabled" : ""}>−</button>
+              <span id="qty-${id}">${qty}</span>
+              <button type="button" data-qty="${id}" data-delta="1" aria-label="Tambah">+</button>
             </div>
-            <button class="btn btn-primary" type="button" data-order="${item.id}">Pesan</button>
+            <button class="btn btn-primary" type="button" data-order="${id}">Pesan</button>
           </div>
         </div>
       </article>
@@ -141,8 +182,8 @@ function bindGrid() {
     }
 
     if (orderBtn) {
-      const product = window.TETUTI_PRODUCTS.find((item) => item.id === orderBtn.dataset.order);
-      openOrder([{ product, qty: qtyState[product.id] || 1 }]);
+      const product = products.find((item) => item.id === orderBtn.dataset.order);
+      if (product) openOrder([{ product, qty: qtyState[product.id] || 1 }]);
     }
   });
 
@@ -177,7 +218,7 @@ function openOrder(lines) {
     .map((line) => {
       const price = priceState[line.product.id]?.price;
       const amount = price == null ? "Harga via WhatsApp" : rupiah.format(price * line.qty);
-      return `<li><span>${line.qty}× ${line.product.name}</span><span>${amount}</span></li>`;
+      return `<li><span>${line.qty}× ${esc(line.product.name)}</span><span>${amount}</span></li>`;
     })
     .join("");
 
@@ -339,7 +380,7 @@ function hydrateBrand() {
 // tidak perlu diperbarui manual setiap ada produk baru.
 function injectStructuredData() {
   const { siteUrl, storeName, tagline, city, whatsappNumber } = window.TETUTI;
-  const absolute = (path) => `${siteUrl}/${path.replace(/^\//, "")}`;
+  const absolute = (path) => (/^https?:/.test(path) ? path : `${siteUrl}/${path.replace(/^\//, "")}`);
   const phone = whatsappNumber.replace(/\D/g, "");
 
   const data = {
@@ -366,16 +407,16 @@ function injectStructuredData() {
         "@type": "Menu",
         "@id": `${siteUrl}/#menu`,
         name: `Menu ${storeName}`,
-        hasMenuSection: [...new Set(window.TETUTI_PRODUCTS.map((item) => item.category))].map(
+        hasMenuSection: [...new Set(products.map((item) => item.category))].map(
           (category) => ({
             "@type": "MenuSection",
             name: category.charAt(0).toUpperCase() + category.slice(1),
-            hasMenuItem: window.TETUTI_PRODUCTS.filter((item) => item.category === category).map(
+            hasMenuItem: products.filter((item) => item.category === category).map(
               (item) => ({
                 "@type": "MenuItem",
                 name: item.name,
-                description: item.desc,
-                image: absolute(item.image),
+                description: item.desc || undefined,
+                image: item.image ? absolute(item.image) : undefined,
               })
             ),
           })
@@ -384,7 +425,9 @@ function injectStructuredData() {
     ],
   };
 
+  document.getElementById("structured-data")?.remove();
   const script = document.createElement("script");
+  script.id = "structured-data";
   script.type = "application/ld+json";
   script.textContent = JSON.stringify(data);
   document.head.appendChild(script);
@@ -472,7 +515,7 @@ hydrateBrand();
 injectStructuredData();
 syncNavHeight();
 renderProducts();
-loadPrices();
+loadMenu();
 bindGrid();
 bindOrderSheet();
 bindWaDock();

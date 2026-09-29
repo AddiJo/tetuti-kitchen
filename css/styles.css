@@ -423,6 +423,18 @@ h2 {
   transform: scale(1.04);
 }
 
+.card-media img.no-photo {
+  padding: 30%;
+  opacity: 0.35;
+}
+
+.grid-empty {
+  grid-column: 1 / -1;
+  padding: 32px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .badge {
   position: absolute;
   top: 14px;
@@ -972,6 +984,10 @@ body.has-checkout #product-grid .card:last-child {
 .js-motion #cara-pesan .section-head,
 .js-motion #cara-pesan .step {
   opacity: 0;
+}
+
+.js-motion #product-grid .card.is-live {
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

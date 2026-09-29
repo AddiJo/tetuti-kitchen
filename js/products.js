@@ -1,3 +1,5 @@
+// Cadangan saja. Isi kartu diatur dari halaman Menu di admin; daftar ini hanya
+// tampil kalau database tidak bisa dihubungi.
 window.TETUTI_PRODUCTS = [
   {
     id: "sambal-crispy",
