@@ -395,18 +395,6 @@ textarea.input,
   box-shadow: inset 4px 0 0 var(--brand);
 }
 
-.sound-hint {
-  padding: 10px 12px;
-  border: 1px dashed var(--brand);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--brand);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .s-baru {
   color: var(--brand);
 }

@@ -182,20 +182,24 @@ async function unlockSound() {
     const Context = window.AudioContext || window.webkitAudioContext;
     if (!Context) return;
     audioCtx = new Context();
-    audioCtx.addEventListener("statechange", syncSoundHint);
+    audioCtx.addEventListener("statechange", syncBell);
   }
   if (audioCtx.state === "suspended") await audioCtx.resume().catch(() => {});
-  syncSoundHint();
+  syncBell();
 }
 
-function syncSoundHint() {
+function soundLocked() {
   const supported = Boolean(window.AudioContext || window.webkitAudioContext);
-  const locked = soundOn && supported && audioCtx?.state !== "running";
-  document.querySelectorAll("[data-sound-hint]").forEach((el) => {
-    el.hidden = !locked;
-  });
+  return soundOn && supported && audioCtx?.state !== "running";
+}
 
-  const label = soundOn ? "Matikan bunyi pesanan baru" : "Nyalakan bunyi pesanan baru";
+function syncBell() {
+  const locked = soundLocked();
+  const label = locked
+    ? "Ketuk untuk menyalakan bunyi pesanan baru"
+    : soundOn
+      ? "Matikan bunyi pesanan baru"
+      : "Nyalakan bunyi pesanan baru";
   soundToggle.classList.toggle("is-muted", !soundOn);
   soundToggle.classList.toggle("is-locked", locked);
   soundToggle.setAttribute("aria-label", label);
@@ -233,6 +237,7 @@ async function checkNewOrders() {
     .select("id, customer_name")
     .eq("source", "situs")
     .is("seen_at", null)
+    .not("status", "in", "(selesai,batal)")
     .order("created_at", { ascending: false })
     .limit(50);
   if (mine !== checkSeq || error || !state.signedIn) return;
@@ -339,9 +344,6 @@ function renderList() {
   app.innerHTML = `
     <section class="page has-actions">
       ${flashHtml()}
-      <button type="button" class="sound-hint" data-sound-hint hidden>
-        Ketuk di sini untuk menyalakan bunyi pesanan baru
-      </button>
       <h1>Pesanan</h1>
       <input class="input" type="search" data-search placeholder="Cari nama atau kode"
         aria-label="Cari nama atau kode pesanan" value="${esc(state.search)}" />
@@ -357,12 +359,6 @@ function renderList() {
         <a class="btn primary full" href="#/baru">+ Catat pesanan</a>
       </div>
     </section>`;
-  syncSoundHint();
-  app.querySelector("[data-sound-hint]").addEventListener("click", async () => {
-    await unlockSound();
-    playChime();
-  });
-
   let searchTimer = 0;
   app.querySelector("[data-search]").addEventListener("input", (event) => {
     clearTimeout(searchTimer);
@@ -455,7 +451,7 @@ function orderCard(order) {
       ? `<strong>${formatRp(order.total)}</strong>`
       : `<span class="muted">${order.item_count ? "Harga belum lengkap" : "Belum ada item"}</span>`;
 
-  const unseen = order.source === "situs" && !order.seen_at;
+  const unseen = order.source === "situs" && !order.seen_at && !["selesai", "batal"].includes(order.status);
   return `
     <a class="order${unseen ? " unseen" : ""}" href="#/pesanan/${esc(order.id)}">
       <span class="row between">
@@ -1091,17 +1087,25 @@ window.addEventListener("hashchange", () => {
 
 document.getElementById("logout").addEventListener("click", () => signOut("Anda sudah keluar."));
 
+// Titik kuning berarti bunyi menyala tapi belum diizinkan browser; ketukan
+// pada lonceng saat itu menyalakan bunyi, bukan mematikannya.
+["pointerdown", "keydown"].forEach((type) => {
+  soundToggle.addEventListener(type, () => {
+    soundToggle.dataset.wasLocked = String(soundLocked());
+  });
+});
 soundToggle.addEventListener("click", async () => {
-  soundOn = !soundOn;
+  if (soundToggle.dataset.wasLocked !== "true") soundOn = !soundOn;
+  delete soundToggle.dataset.wasLocked;
   localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
   if (soundOn) {
     await unlockSound();
     playChime();
   }
-  syncSoundHint();
+  syncBell();
   toast(soundOn ? "Bunyi pesanan baru menyala" : "Bunyi pesanan baru dimatikan");
 });
-syncSoundHint();
+syncBell();
 
 ["pointerdown", "keydown"].forEach((type) => {
   document.addEventListener(type, noteActivity, { passive: true });
