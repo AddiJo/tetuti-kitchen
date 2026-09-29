@@ -8,6 +8,8 @@ import {
   formatDay,
   formatRp,
   fromJakartaInput,
+  invoiceCaption,
+  INVOICE_STAMP,
   INVOICE_STATUS_LABEL,
   invoiceLines,
   invoiceMessage,
@@ -22,6 +24,7 @@ import {
   uniqueSlug,
   waLink,
 } from "./lib.js";
+import { invoicePdfFile } from "./invoice-pdf.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
@@ -709,6 +712,7 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
 // Tagihan --------------------------------------------------------------------
 
 const INVOICE_ELIGIBLE = ["dikonfirmasi", "diproses", "selesai"];
+const PDF_LABEL = { draft: "Kirim PDF ke WhatsApp", terkirim: "Kirim ulang PDF", lunas: "Kirim PDF lunas" };
 const INSTRUCTION_HINT = {
   transfer: "BCA 1234567890 a.n. Nama Pemilik",
   qris: "Kode QRIS kami kirim di chat ini.",
@@ -793,7 +797,8 @@ function activeInvoiceHtml(invoice, order, total) {
   if (invoice.status === "draft") {
     meta = "Belum dikirim ke pembeli.";
     actions = `
-      <a class="btn primary" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim lewat WhatsApp</a>
+      <button class="btn primary" type="button" data-invoice-pdf>${PDF_LABEL.draft}</button>
+      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim teks</a>
       <a class="btn" href="#/pesanan/${esc(order.id)}/tagihan">Ubah</a>
       <button class="btn" type="button" data-invoice-paid>Tandai lunas</button>
       ${view}
@@ -802,13 +807,15 @@ function activeInvoiceHtml(invoice, order, total) {
     meta = `Dikirim ${esc(formatDate(invoice.sent_at))}. Menunggu pembayaran.`;
     actions = `
       <button class="btn primary" type="button" data-invoice-paid>Tandai lunas</button>
-      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim ulang</a>
+      <button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.terkirim}</button>
+      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim ulang teks</a>
       ${view}
       <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
   } else {
     const differs = invoice.paid_amount !== invoice.total ? ` dari tagihan ${esc(formatRp(invoice.total))}` : "";
     meta = `Diterima ${esc(formatRp(invoice.paid_amount))}${differs} · ${esc(formatDate(invoice.paid_at))}.`;
     actions = `
+      <button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.lunas}</button>
       ${view}
       <button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
   }
@@ -829,10 +836,84 @@ async function updateInvoice(invoiceId, changes, errorEl) {
   return !error;
 }
 
+const pdfCache = new Map();
+
+// PDF disiapkan begitu halaman tampil. Safari hanya mengizinkan menu Bagikan
+// sesaat setelah tombol diketuk, jadi file harus sudah jadi saat itu.
+function invoicePdf(invoice, order) {
+  const key = `${invoice.id}:${invoice.updated_at}`;
+  if (!pdfCache.has(key)) {
+    const store = window.TETUTI ?? { storeName: "Tetuti Kitchen" };
+    const file = invoicePdfFile(invoice, order, store).catch((error) => {
+      pdfCache.delete(key);
+      throw error;
+    });
+    pdfCache.set(key, file);
+  }
+  return pdfCache.get(key);
+}
+
+// Menu Bagikan tidak bisa memilih nomor tujuan, jadi admin memilih chat pembeli
+// sendiri. Browser tanpa berbagi file mengunduh PDF lalu membuka chat pembeli.
+// Hasil true berarti status tagihan berubah dan halaman perlu dimuat ulang.
+async function sendInvoicePdf(invoice, order, button, errorEl) {
+  button.disabled = true;
+  const caption = invoiceCaption(invoice, order);
+  let shared;
+  try {
+    const file = await invoicePdf(invoice, order);
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text: caption });
+      shared = true;
+    } else {
+      const url = URL.createObjectURL(file);
+      Object.assign(document.createElement("a"), { href: url, download: file.name }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      Object.assign(document.createElement("a"), {
+        href: waLink(order.customer_phone, caption),
+        target: "_blank",
+        rel: "noopener",
+      }).click();
+      shared = false;
+    }
+  } catch (error) {
+    button.disabled = false;
+    if (error.name === "AbortError") return false;
+    if (error.name === "NotAllowedError") {
+      showError(errorEl, "PDF sudah siap. Tekan tombolnya sekali lagi.");
+    } else {
+      showError(errorEl, `PDF gagal dibuat. ${errorMessage(error)}`);
+    }
+    return false;
+  }
+
+  const done = shared ? "PDF invoice dibagikan" : "PDF diunduh, lampirkan di chat WhatsApp pembeli";
+  if (invoice.status === "lunas") {
+    button.disabled = false;
+    toast(done);
+    return false;
+  }
+  const changes = invoice.status === "draft" ? { status: "terkirim" } : { sent_at: new Date().toISOString() };
+  if (!(await updateInvoice(invoice.id, changes, errorEl))) {
+    button.disabled = false;
+    return false;
+  }
+  toast(invoice.status === "draft" ? `${done}. Tagihan ditandai terkirim.` : done);
+  return true;
+}
+
 function bindInvoiceActions(order, invoices, errorEl) {
   const active = invoices.find((invoice) => invoice.status !== "batal");
   if (!active) return;
   const reload = () => renderDetail(order.id);
+
+  const pdfButton = app.querySelector("[data-invoice-pdf]");
+  if (pdfButton) {
+    invoicePdf(active, order).catch(() => {});
+    pdfButton.addEventListener("click", async () => {
+      if (await sendInvoicePdf(active, order, pdfButton, errorEl)) reload();
+    });
+  }
 
   // Tautan WhatsApp dibuka browser seperti biasa; status dicatat di belakangnya.
   app.querySelector("[data-invoice-send]")?.addEventListener("click", async () => {
@@ -1030,9 +1111,6 @@ async function renderInvoiceForm(orderId) {
   });
 }
 
-// Status yang dibaca pembeli di dokumen; Draft dan Terkirim sama-sama belum dibayar.
-const DOC_STAMP = { draft: "Belum dibayar", terkirim: "Belum dibayar", lunas: "Lunas", batal: "Dibatalkan" };
-
 async function renderInvoiceDoc(id) {
   const seq = ++renderSeq;
   app.innerHTML = `<p class="page muted">Memuat…</p>`;
@@ -1077,19 +1155,19 @@ async function renderInvoiceDoc(id) {
         <a class="back" href="#/pesanan/${esc(invoice.order_id)}">‹ Detail pesanan</a>
         ${
           invoice.status === "draft"
-            ? `<p class="notice">Tagihan masih Draft. Kalau PDF ini dikirim sendiri ke pembeli, tekan Tandai terkirim.</p>`
+            ? `<p class="notice">Tagihan masih Draft. Kalau PDF dikirim dengan cara lain, tekan Tandai terkirim.</p>`
             : ""
         }
         ${
           invoice.status === "batal"
             ? `<p class="notice error">Tagihan ini sudah dibatalkan. Jangan dikirim ke pembeli.</p>`
-            : ""
+            : `<button class="btn primary full" type="button" data-invoice-pdf>${PDF_LABEL[invoice.status]}</button>
+              <p class="small muted">Di HP, pilih WhatsApp lalu chat pembeli. Di laptop, PDF diunduh dan chat pembeli terbuka.</p>`
         }
         <div class="row">
-          <button class="btn primary full" type="button" data-print>Cetak / Simpan PDF</button>
-          ${invoice.status === "draft" ? `<button class="btn" type="button" data-mark-sent>Tandai terkirim</button>` : ""}
+          <button class="btn full" type="button" data-print>Cetak / Simpan PDF</button>
+          ${invoice.status === "draft" ? `<button class="btn full" type="button" data-mark-sent>Tandai terkirim</button>` : ""}
         </div>
-        <p class="small muted">Di HP: tekan Cetak, pilih Simpan sebagai PDF, lalu kirim file-nya lewat WhatsApp.</p>
         <p class="error" data-error hidden></p>
       </div>
 
@@ -1119,7 +1197,7 @@ async function renderInvoiceDoc(id) {
             <dt>Tanggal</dt><dd>${esc(formatDay(invoice.created_at))}</dd>
             <dt>Pesanan</dt><dd>${esc(order.code)}</dd>
             ${order.requested_at ? `<dt>Jadwal</dt><dd>${esc(formatDate(order.requested_at))}</dd>` : ""}
-            <dt>Status</dt><dd><span class="doc-stamp d-${invoice.status}">${DOC_STAMP[invoice.status]}</span></dd>
+            <dt>Status</dt><dd><span class="doc-stamp d-${invoice.status}">${INVOICE_STAMP[invoice.status]}</span></dd>
           </dl>
         </div>
 
@@ -1151,6 +1229,13 @@ async function renderInvoiceDoc(id) {
 
   const errorEl = app.querySelector("[data-error]");
   app.querySelector("[data-print]").addEventListener("click", () => window.print());
+  const pdfButton = app.querySelector("[data-invoice-pdf]");
+  if (pdfButton) {
+    invoicePdf(invoice, order).catch(() => {});
+    pdfButton.addEventListener("click", async () => {
+      if (await sendInvoicePdf(invoice, order, pdfButton, errorEl)) renderInvoiceDoc(invoice.id);
+    });
+  }
   const markSent = app.querySelector("[data-mark-sent]");
   markSent?.addEventListener("click", async () => {
     markSent.disabled = true;

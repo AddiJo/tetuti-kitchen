@@ -152,7 +152,7 @@ Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
 - Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
-- Kirim tagihan: membuka WhatsApp ke nomor pembeli dengan teks item, total, cara bayar, dan kode tagihan.
+- Kirim tagihan: file PDF invoice dikirim ke WhatsApp pembeli. Teks item, total, cara bayar, dan kode tagihan tetap tersedia sebagai cadangan. (Keputusan pemilik, 29 Sep 2026.)
 - Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci, kecuali lewat Batalkan lunas (dengan konfirmasi) yang mengembalikannya ke Terkirim untuk memperbaiki salah tandai. (Keputusan pemilik, 29 Sep 2026.)
 
 Status tagihan: Draft, Terkirim, Lunas, Batal.
@@ -166,7 +166,8 @@ Aturan yang dijaga database:
 
 Di admin:
 
-- Tombol Kirim lewat WhatsApp membuka chat pembeli dan menandai tagihan Terkirim. Kirim ulang membuka chat yang sama.
+- Kirim PDF ke WhatsApp: admin membuat PDF invoice (jsPDF, dimuat saat dibutuhkan) dan membuka menu Bagikan di HP; admin memilih WhatsApp lalu chat pembeli, karena tautan WhatsApp tidak bisa melampirkan file ke nomor tertentu. Browser tanpa berbagi file mengunduh PDF lalu membuka chat pembeli untuk dilampirkan manual. Tagihan Draft menjadi Terkirim; Kirim ulang mencatat waktu kirim; Kirim PDF lunas tidak mengubah status.
+- Kirim teks (cadangan): membuka chat pembeli dengan rincian tagihan sebagai teks, dengan pencatatan status yang sama.
 - Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
 - Daftar pesanan memberi label Belum bayar (tagihan terkirim) atau Lunas.
 - Lihat invoice: dokumen tagihan berkop toko (nama, situs, WhatsApp dari `js/config.js`) berisi pembeli, tanggal, kode pesanan, tabel item, subtotal, ongkir, total, cara bayar, dan cap Belum dibayar, Lunas, atau Dibatalkan. Tombol Cetak / Simpan PDF memakai dialog cetak browser; nama file mengikuti kode tagihan. Tagihan Draft yang PDF-nya dikirim sendiri bisa ditandai terkirim dari halaman ini. (Permintaan pemilik, 29 Sep 2026.)
@@ -277,4 +278,5 @@ Fase 2, langkah 2 — tagihan:
 - [x] Agen: migrasi `20260929040000_tagihan.sql` (tabel `invoices`, kode, salinan isi, aturan status, kaitan dengan pesanan batal dan lunas); halaman buat tagihan, kirim WhatsApp, tandai lunas, batalkan lunas.
 - [x] Agen: halaman invoice cetak / PDF (tanpa migrasi).
 - [x] Pemilik: jalankan migrasi tagihan, push, kirim tagihan ke WhatsApp (29 Sep 2026).
-- [ ] Pemilik: push halaman invoice, lalu uji Simpan PDF dari HP dan tandai lunas.
+- [x] Agen: kirim invoice sebagai PDF lewat menu Bagikan, teks sebagai cadangan (tanpa migrasi).
+- [ ] Pemilik: push, lalu uji Kirim PDF ke WhatsApp dari HP ke nomor sendiri dan tandai lunas.

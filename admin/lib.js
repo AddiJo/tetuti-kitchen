@@ -158,6 +158,25 @@ export function invoiceMessage(invoice, order) {
   ].join("\n");
 }
 
+// Status yang dibaca pembeli di dokumen; Draft dan Terkirim sama-sama belum dibayar.
+export const INVOICE_STAMP = { draft: "Belum dibayar", terkirim: "Belum dibayar", lunas: "Lunas", batal: "Dibatalkan" };
+
+// Keterangan singkat yang ikut terkirim bersama file PDF.
+export function invoiceCaption(invoice, order) {
+  const what = invoice.status === "lunas" ? `invoice lunas ${invoice.code}` : `invoice ${invoice.code}`;
+  return `Halo Kak ${order.customer_name}, berikut ${what} untuk pesanan ${order.code} di Tetuti Kitchen. Total ${formatRp(invoice.total)}.`;
+}
+
+const PDF_REPLACEMENTS = { "‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "…": "...", "\u202f": " " };
+
+// Huruf bawaan PDF hanya memuat Latin-1; karakter lain (emoji, kutip miring
+// dari keyboard HP) diganti padanannya atau dibuang supaya tidak jadi huruf acak.
+export function pdfText(value) {
+  return String(value ?? "")
+    .replace(/[^\x00-\xff]/gu, (char) => PDF_REPLACEMENTS[char] ?? "")
+    .replace(/ {2,}/g, " ");
+}
+
 export function waLink(phone, text) {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
