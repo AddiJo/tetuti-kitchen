@@ -407,9 +407,14 @@ textarea.input,
   color: var(--info);
 }
 
-.s-selesai,
+.s-selesai {
+  color: var(--ok);
+  background: #e6f2e8;
+}
+
 .s-batal {
-  color: var(--muted);
+  color: var(--danger);
+  background: #fbe7e7;
 }
 
 .empty {
