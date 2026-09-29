@@ -785,7 +785,6 @@ function invoiceSection(order, invoices, total) {
 }
 
 function activeInvoiceHtml(invoice, order, total) {
-  const send = waLink(order.customer_phone, invoiceMessage(invoice, order));
   const outdated =
     invoice.status !== "lunas" && invoiceOutdated(invoice, order)
       ? `<p class="notice">Isi pesanan berubah sejak tagihan dibuat${
@@ -794,37 +793,33 @@ function activeInvoiceHtml(invoice, order, total) {
         <button class="btn" type="button" data-invoice-redo>Buat ulang tagihan</button>`
       : "";
 
-  const view = `<a class="btn" href="#/tagihan/${esc(invoice.id)}">Lihat invoice</a>`;
+  const cancel = `<button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
   let meta;
   let actions;
+  let more;
   if (invoice.status === "draft") {
     meta = "Belum dikirim ke pembeli.";
     actions = `
       <button class="btn primary" type="button" data-invoice-pdf>${PDF_LABEL.draft}</button>
-      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim teks</a>
-      <a class="btn" href="#/pesanan/${esc(order.id)}/tagihan">Ubah</a>
-      <button class="btn" type="button" data-invoice-paid>Tandai lunas</button>
-      ${view}
-      <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
+      <button class="btn" type="button" data-invoice-paid>Tandai lunas</button>`;
+    more = `<a class="btn" href="#/pesanan/${esc(order.id)}/tagihan">Ubah</a>${cancel}`;
   } else if (invoice.status === "terkirim") {
     meta = `Dikirim ${esc(formatDate(invoice.sent_at))}. Menunggu pembayaran.`;
     actions = `
       <button class="btn primary" type="button" data-invoice-paid>Tandai lunas</button>
-      <button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.terkirim}</button>
-      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim ulang teks</a>
-      ${view}
-      <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
+      <button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.terkirim}</button>`;
+    more = cancel;
   } else {
     const differs = invoice.paid_amount !== invoice.total ? ` dari tagihan ${esc(formatRp(invoice.total))}` : "";
     meta = `Diterima ${esc(formatRp(invoice.paid_amount))}${differs} · ${esc(formatDate(invoice.paid_at))}.`;
-    actions = `
-      <button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.lunas}</button>
-      ${view}
-      <button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
+    actions = `<button class="btn" type="button" data-invoice-pdf>${PDF_LABEL.lunas}</button>`;
+    more = `<button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
   }
 
   return `
-    <div class="line"><span class="code">${esc(invoice.code)}</span><strong>${esc(formatRp(invoice.total))}</strong></div>
+    <div class="line"><a class="code" href="#/tagihan/${esc(invoice.id)}" title="Lihat invoice">${esc(
+      invoice.code
+    )}</a><strong>${esc(formatRp(invoice.total))}</strong></div>
     <span class="small">${esc(METHOD_LABEL[invoice.method])}${
       invoice.instructions ? ` · ${esc(invoice.instructions)}` : ""
     }</span>
@@ -834,7 +829,11 @@ function activeInvoiceHtml(invoice, order, total) {
         : ""
     }</span>
     ${outdated}
-    <div class="invoice-actions">${actions}</div>`;
+    <div class="invoice-actions">${actions}</div>
+    <details class="invoice-more">
+      <summary>Lainnya</summary>
+      <div class="invoice-actions">${more}</div>
+    </details>`;
 }
 
 async function updateInvoice(invoiceId, changes, errorEl) {
@@ -1025,16 +1024,6 @@ function bindInvoiceActions(order, invoices, errorEl) {
     });
   }
 
-  // Tautan WhatsApp dibuka browser seperti biasa; status dicatat di belakangnya.
-  app.querySelector("[data-invoice-send]")?.addEventListener("click", async () => {
-    const changes =
-      active.status === "draft" ? { status: "terkirim" } : { sent_at: new Date().toISOString() };
-    if (await updateInvoice(active.id, changes, errorEl)) {
-      toast(active.status === "draft" ? "Tagihan ditandai terkirim" : "Tagihan dikirim ulang");
-      reload();
-    }
-  });
-
   app.querySelector("[data-invoice-cancel]")?.addEventListener("click", async () => {
     if (!window.confirm(`Batalkan tagihan ${active.code}? Pesanan tidak ikut dibatalkan.`)) return;
     if (await updateInvoice(active.id, { status: "batal" }, errorEl)) {
@@ -1166,7 +1155,7 @@ async function renderInvoiceForm(orderId) {
           <textarea class="input" name="instructions" rows="3" maxlength="500"></textarea>
         </label>
         <div class="field">
-          <span>Pesan yang akan terkirim ke WhatsApp pembeli</span>
+          <span>Ringkasan tagihan</span>
           <pre class="wa-preview" data-preview></pre>
           ${active ? "" : `<span class="small muted">Nomor tagihan dibuat saat disimpan.</span>`}
         </div>

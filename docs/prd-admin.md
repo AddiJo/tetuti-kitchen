@@ -152,7 +152,7 @@ Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
 - Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
-- Kirim tagihan: file PDF invoice dikirim ke WhatsApp pembeli. Teks item, total, cara bayar, dan kode tagihan tetap tersedia sebagai cadangan. (Keputusan pemilik, 29 Sep 2026.)
+- Kirim tagihan: file PDF invoice dikirim ke WhatsApp pembeli. (Keputusan pemilik, 29 Sep 2026.)
 - Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci, kecuali lewat Batalkan lunas (dengan konfirmasi) yang mengembalikannya ke Terkirim untuk memperbaiki salah tandai. (Keputusan pemilik, 29 Sep 2026.)
 
 Status tagihan: Draft, Terkirim, Lunas, Batal.
@@ -170,7 +170,8 @@ Di admin:
 - Satu tagihan satu tautan tetap. File ditimpa saat dikirim ulang, ditandai lunas, dibatalkan lunasnya, atau dibatalkan, jadi tautan di chat pembeli selalu menampilkan cap terbaru. Tagihan Draft menjadi Terkirim; Kirim ulang mencatat waktu kirim; Kirim PDF lunas tidak mengubah status.
 - Masa simpan PDF: 30 hari setelah pesanan Selesai atau Batal, file dihapus dan tautannya berhenti bekerja, supaya tautan yang bocor tidak membuka nama, nomor, dan alamat pembeli selamanya. Supabase menolak penghapusan file lewat SQL, jadi dashboard admin yang menghapusnya lewat Storage API saat dibuka (paling sering sekali sehari, 100 file per kali). Database hanya mendaftar file yang kedaluwarsa (`expired_invoice_pdfs()`, khusus admin) dan mengizinkan `pdf_path` dikosongkan, termasuk pada tagihan Batal. Alamat PDF yang sudah ada tidak bisa diganti. Tautan `/i/…` juga dikirim dengan `X-Content-Type-Options: nosniff`. (Keputusan pemilik, 29 Sep 2026.)
 - Bagikan file PDF (halaman invoice): mengirim file lewat menu Bagikan di HP; admin memilih chat pembeli sendiri.
-- Kirim teks (cadangan): membuka chat pembeli dengan rincian tagihan sebagai teks, dengan pencatatan status yang sama.
+- Kartu tagihan di detail pesanan hanya menampilkan tombol utama: Kirim PDF ke WhatsApp dan Tandai lunas (Draft), Tandai lunas dan Kirim ulang PDF (Terkirim), Kirim PDF lunas (Lunas). Ubah, Batalkan tagihan, dan Batalkan lunas ada di bawah "Lainnya". Kode tagihan membuka halaman invoice. Tombol Kirim teks dihapus. (Keputusan pemilik, 29 Sep 2026.)
+- Batalkan tagihan tetap ada karena itu satu-satunya cara mengganti tagihan terkirim yang salah isi (cara bayar terkunci setelah Draft, satu pesanan satu tagihan aktif), dan tautan PDF pembeli ikut bercap Dibatalkan.
 - Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
 - Daftar pesanan memberi label Belum bayar (tagihan terkirim) atau Lunas.
 - Lihat invoice: dokumen tagihan berkop toko (nama, situs, WhatsApp dari `js/config.js`) berisi pembeli, tanggal, kode pesanan, tabel item, subtotal, ongkir, total, cara bayar, dan cap Belum dibayar, Lunas, atau Dibatalkan. Tombol Cetak / Simpan PDF memakai dialog cetak browser; nama file mengikuti kode tagihan. Tagihan Draft yang PDF-nya dikirim sendiri bisa ditandai terkirim dari halaman ini. (Permintaan pemilik, 29 Sep 2026.)
