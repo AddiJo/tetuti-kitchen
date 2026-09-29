@@ -188,6 +188,7 @@ async function enterAdmin() {
   await loadMenu();
   route();
   startWatching();
+  cleanupExpiredPdfs();
 }
 
 // Pesanan baru -----------------------------------------------------------------
@@ -933,6 +934,33 @@ async function refreshSentPdfs(column, value) {
     }
   }
   if (failed) toast("Status tersimpan, tapi PDF di tautan pembeli belum diperbarui. Kirim ulang PDF.");
+}
+
+const PDF_CLEANUP_KEY = "tetuti-admin-pdf-cleanup";
+const PDF_CLEANUP_EVERY_MS = 24 * 60 * 60 * 1000;
+const PDF_CLEANUP_BATCH = 100;
+
+// Supabase menolak penghapusan file lewat SQL, jadi PDF kedaluwarsa (30 hari
+// setelah pesanan Selesai atau Batal) dihapus dari sini saat dashboard dibuka.
+// File dihapus dulu, baru alamatnya dikosongkan, supaya tidak ada file publik
+// yang tertinggal tanpa catatan.
+async function cleanupExpiredPdfs() {
+  const last = Number(localStorage.getItem(PDF_CLEANUP_KEY)) || 0;
+  if (Date.now() - last < PDF_CLEANUP_EVERY_MS) return;
+  const { data, error } = await supabase.rpc("expired_invoice_pdfs");
+  if (error) return;
+  if (data.length) {
+    const { error: removeError } = await supabase.storage
+      .from(PDF_BUCKET)
+      .remove(data.map((row) => row.pdf_path));
+    if (removeError) return;
+    const { error: clearError } = await supabase
+      .from("invoices")
+      .update({ pdf_path: null })
+      .in("id", data.map((row) => row.id));
+    if (clearError || data.length === PDF_CLEANUP_BATCH) return;
+  }
+  localStorage.setItem(PDF_CLEANUP_KEY, String(Date.now()));
 }
 
 // Menu Bagikan tidak bisa memilih nomor tujuan, jadi admin memilih chat pembeli

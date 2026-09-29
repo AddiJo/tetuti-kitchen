@@ -168,6 +168,7 @@ Di admin:
 
 - Kirim PDF ke WhatsApp: tautan WhatsApp ke nomor tertentu hanya bisa membawa teks, jadi admin membuat PDF invoice (jsPDF, dimuat saat dibutuhkan), mengunggahnya ke bucket publik `invoice-pdf`, lalu chat pembeli langsung terbuka dengan pesan singkat dan tautan `www.tetuti.my.id/i/<32 hex acak>/<kode>.pdf` (rewrite Vercel ke Supabase Storage, `noindex`). Isi bucket tidak bisa didaftar pengunjung. (Keputusan pemilik, 29 Sep 2026.)
 - Satu tagihan satu tautan tetap. File ditimpa saat dikirim ulang, ditandai lunas, dibatalkan lunasnya, atau dibatalkan, jadi tautan di chat pembeli selalu menampilkan cap terbaru. Tagihan Draft menjadi Terkirim; Kirim ulang mencatat waktu kirim; Kirim PDF lunas tidak mengubah status.
+- Masa simpan PDF: 30 hari setelah pesanan Selesai atau Batal, file dihapus dan tautannya berhenti bekerja, supaya tautan yang bocor tidak membuka nama, nomor, dan alamat pembeli selamanya. Supabase menolak penghapusan file lewat SQL, jadi dashboard admin yang menghapusnya lewat Storage API saat dibuka (paling sering sekali sehari, 100 file per kali). Database hanya mendaftar file yang kedaluwarsa (`expired_invoice_pdfs()`, khusus admin) dan mengizinkan `pdf_path` dikosongkan, termasuk pada tagihan Batal. Alamat PDF yang sudah ada tidak bisa diganti. Tautan `/i/…` juga dikirim dengan `X-Content-Type-Options: nosniff`. (Keputusan pemilik, 29 Sep 2026.)
 - Bagikan file PDF (halaman invoice): mengirim file lewat menu Bagikan di HP; admin memilih chat pembeli sendiri.
 - Kirim teks (cadangan): membuka chat pembeli dengan rincian tagihan sebagai teks, dengan pencatatan status yang sama.
 - Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
@@ -284,3 +285,5 @@ Fase 2, langkah 2 — tagihan:
 - [x] Agen: kirim tautan PDF langsung ke nomor pembeli (migrasi `20260929050000_invoice_pdf.sql`, rewrite `/i/…` di `vercel.json`).
 - [x] Pemilik: jalankan migrasi invoice PDF, push, dan uji kirim tautan PDF ke WhatsApp (29 Sep 2026). Rewrite `/i/…` di produksi meneruskan ke Supabase Storage dengan `noindex`.
 - [ ] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas.
+- [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
+- [ ] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push.
