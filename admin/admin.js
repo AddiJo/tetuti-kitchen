@@ -21,6 +21,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 // dipakai dijalankan di sini.
 const IDLE_LIMIT_MS = 12 * 60 * 60 * 1000;
 const LAST_ACTIVE_KEY = "tetuti-admin-last-active";
+const SOUND_KEY = "tetuti-admin-sound";
 const IDLE_MESSAGE = "Sesi habis karena 12 jam tidak dipakai. Silakan masuk lagi.";
 
 const FLOW = ["baru", "dikonfirmasi", "diproses", "siap", "selesai"];
@@ -58,6 +59,7 @@ const app = document.getElementById("app");
 const topbar = document.getElementById("topbar");
 const toastEl = document.getElementById("toast");
 const cancelDialog = document.getElementById("cancel-dialog");
+const soundToggle = document.getElementById("sound-toggle");
 
 const BASE_TITLE = document.title;
 
@@ -81,6 +83,7 @@ let listSeq = 0;
 let lastMark = 0;
 let toastTimer = 0;
 let audioCtx = null;
+let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
 let ordersChannel = null;
 let pollTimer = 0;
 let checkSeq = 0;
@@ -186,12 +189,20 @@ async function unlockSound() {
 
 function syncSoundHint() {
   const supported = Boolean(window.AudioContext || window.webkitAudioContext);
+  const locked = soundOn && supported && audioCtx?.state !== "running";
   document.querySelectorAll("[data-sound-hint]").forEach((el) => {
-    el.hidden = !supported || audioCtx?.state === "running";
+    el.hidden = !locked;
   });
+
+  const label = soundOn ? "Matikan bunyi pesanan baru" : "Nyalakan bunyi pesanan baru";
+  soundToggle.classList.toggle("is-muted", !soundOn);
+  soundToggle.classList.toggle("is-locked", locked);
+  soundToggle.setAttribute("aria-label", label);
+  soundToggle.title = label;
 }
 
 function playChime() {
+  if (!soundOn) return;
   if (audioCtx?.state === "running") {
     const start = audioCtx.currentTime;
     [0, 0.18, 0.5, 0.68].forEach((offset, index) => {
@@ -1078,6 +1089,18 @@ window.addEventListener("hashchange", () => {
 });
 
 document.getElementById("logout").addEventListener("click", () => signOut("Anda sudah keluar."));
+
+soundToggle.addEventListener("click", async () => {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
+  if (soundOn) {
+    await unlockSound();
+    playChime();
+  }
+  syncSoundHint();
+  toast(soundOn ? "Bunyi pesanan baru menyala" : "Bunyi pesanan baru dimatikan");
+});
+syncSoundHint();
 
 ["pointerdown", "keydown"].forEach((type) => {
   document.addEventListener(type, noteActivity, { passive: true });

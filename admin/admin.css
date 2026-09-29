@@ -93,6 +93,47 @@ p {
   text-underline-offset: 5px;
 }
 
+.topbar .icon-toggle {
+  position: relative;
+  display: inline-flex;
+  padding: 6px 8px;
+}
+
+.icon-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-toggle .bell-off,
+.icon-toggle.is-muted .bell-on {
+  display: none;
+}
+
+.icon-toggle.is-muted .bell-off {
+  display: block;
+}
+
+.icon-toggle.is-muted {
+  opacity: 0.7;
+}
+
+/* Bunyi menyala tapi browser belum mengizinkan: halaman perlu diketuk sekali. */
+.icon-toggle.is-locked::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f5c542;
+}
+
 .topbar button {
   padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.55);
