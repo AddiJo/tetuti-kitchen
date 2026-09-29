@@ -166,7 +166,9 @@ Aturan yang dijaga database:
 
 Di admin:
 
-- Kirim PDF ke WhatsApp: admin membuat PDF invoice (jsPDF, dimuat saat dibutuhkan) dan membuka menu Bagikan di HP; admin memilih WhatsApp lalu chat pembeli, karena tautan WhatsApp tidak bisa melampirkan file ke nomor tertentu. Browser tanpa berbagi file mengunduh PDF lalu membuka chat pembeli untuk dilampirkan manual. Tagihan Draft menjadi Terkirim; Kirim ulang mencatat waktu kirim; Kirim PDF lunas tidak mengubah status.
+- Kirim PDF ke WhatsApp: tautan WhatsApp ke nomor tertentu hanya bisa membawa teks, jadi admin membuat PDF invoice (jsPDF, dimuat saat dibutuhkan), mengunggahnya ke bucket publik `invoice-pdf`, lalu chat pembeli langsung terbuka dengan pesan singkat dan tautan `www.tetuti.my.id/i/<32 hex acak>/<kode>.pdf` (rewrite Vercel ke Supabase Storage, `noindex`). Isi bucket tidak bisa didaftar pengunjung. (Keputusan pemilik, 29 Sep 2026.)
+- Satu tagihan satu tautan tetap. File ditimpa saat dikirim ulang, ditandai lunas, dibatalkan lunasnya, atau dibatalkan, jadi tautan di chat pembeli selalu menampilkan cap terbaru. Tagihan Draft menjadi Terkirim; Kirim ulang mencatat waktu kirim; Kirim PDF lunas tidak mengubah status.
+- Bagikan file PDF (halaman invoice): mengirim file lewat menu Bagikan di HP; admin memilih chat pembeli sendiri.
 - Kirim teks (cadangan): membuka chat pembeli dengan rincian tagihan sebagai teks, dengan pencatatan status yang sama.
 - Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
 - Daftar pesanan memberi label Belum bayar (tagihan terkirim) atau Lunas.
@@ -279,4 +281,6 @@ Fase 2, langkah 2 — tagihan:
 - [x] Agen: halaman invoice cetak / PDF (tanpa migrasi).
 - [x] Pemilik: jalankan migrasi tagihan, push, kirim tagihan ke WhatsApp (29 Sep 2026).
 - [x] Agen: kirim invoice sebagai PDF lewat menu Bagikan, teks sebagai cadangan (tanpa migrasi).
-- [ ] Pemilik: push, lalu uji Kirim PDF ke WhatsApp dari HP ke nomor sendiri dan tandai lunas.
+- [x] Agen: kirim tautan PDF langsung ke nomor pembeli (migrasi `20260929050000_invoice_pdf.sql`, rewrite `/i/…` di `vercel.json`).
+- [ ] Pemilik: jalankan migrasi invoice PDF sebelum push.
+- [ ] Pemilik: push, lalu uji Kirim PDF ke WhatsApp ke nomor sendiri, buka tautannya, tandai lunas, dan buka tautan yang sama lagi.

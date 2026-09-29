@@ -9,6 +9,7 @@ import {
   formatRp,
   fromJakartaInput,
   invoiceCaption,
+  invoiceLinkMessage,
   INVOICE_STAMP,
   INVOICE_STATUS_LABEL,
   invoiceLines,
@@ -706,6 +707,7 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
 
   cancelDialog.close();
   toast("Pesanan dibatalkan");
+  refreshSentPdfs("order_id", state.cancelOrderId);
   renderDetail(state.cancelOrderId);
 });
 
@@ -825,7 +827,11 @@ function activeInvoiceHtml(invoice, order, total) {
     <span class="small">${esc(METHOD_LABEL[invoice.method])}${
       invoice.instructions ? ` · ${esc(invoice.instructions)}` : ""
     }</span>
-    <span class="small muted">${meta}</span>
+    <span class="small muted">${meta}${
+      invoice.pdf_path
+        ? ` · <a href="${esc(pdfLink(invoice.pdf_path))}" target="_blank" rel="noopener">Buka PDF</a>`
+        : ""
+    }</span>
     ${outdated}
     <div class="invoice-actions">${actions}</div>`;
 }
@@ -853,10 +859,86 @@ function invoicePdf(invoice, order) {
   return pdfCache.get(key);
 }
 
+const PDF_BUCKET = "invoice-pdf";
+const INVOICE_WITH_ORDER = "*, orders(code, customer_name, customer_phone, fulfillment, address, requested_at)";
+
+function randomHex(bytes) {
+  return [...crypto.getRandomValues(new Uint8Array(bytes))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function pdfLink(path) {
+  return `${window.TETUTI?.siteUrl ?? location.origin}/i/${path}`;
+}
+
+async function uploadInvoicePdf(invoice, order, path) {
+  const file = await invoicePdf(invoice, order);
+  const { error } = await supabase.storage
+    .from(PDF_BUCKET)
+    .upload(path, file, { contentType: "application/pdf", cacheControl: "60", upsert: true });
+  if (error) throw error;
+}
+
+// Tautan WhatsApp ke nomor tertentu hanya bisa membawa teks, jadi PDF diunggah
+// dulu dan pembeli menerima tautannya. Jendela chat dibuka saat tombol diketuk
+// supaya tidak diblokir browser, lalu diarahkan setelah unggahan selesai.
+// Hasil true berarti tagihan berubah dan halaman perlu dimuat ulang.
+async function sendInvoiceLink(invoice, order, button, errorEl) {
+  button.disabled = true;
+  const chat = window.open("", "_blank");
+  if (chat) {
+    chat.opener = null;
+    chat.document.title = "Menyiapkan invoice…";
+  }
+  const path = invoice.pdf_path ?? `${randomHex(16)}/${invoice.code}.pdf`;
+  const changes = invoice.pdf_path ? {} : { pdf_path: path };
+  if (invoice.status === "draft") changes.status = "terkirim";
+  else if (invoice.status === "terkirim") changes.sent_at = new Date().toISOString();
+
+  try {
+    await uploadInvoicePdf(invoice, order, path);
+    if (Object.keys(changes).length) {
+      const { error } = await supabase.from("invoices").update(changes).eq("id", invoice.id);
+      if (error) throw error;
+    }
+  } catch (error) {
+    chat?.close();
+    button.disabled = false;
+    showError(errorEl, `Invoice gagal dikirim. ${errorMessage(error)}`);
+    return false;
+  }
+
+  const url = waLink(order.customer_phone, invoiceLinkMessage(invoice, order, pdfLink(path)));
+  if (chat) chat.location.href = url;
+  else location.href = url;
+  toast(invoice.status === "draft" ? "Invoice dikirim, tagihan ditandai terkirim" : "Invoice dikirim");
+  return true;
+}
+
+// Tautan yang sudah dikirim tetap sama; isinya diperbarui supaya cap Lunas atau
+// Dibatalkan juga terlihat oleh pembeli.
+async function refreshSentPdfs(column, value) {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select(INVOICE_WITH_ORDER)
+    .eq(column, value)
+    .not("pdf_path", "is", null);
+  let failed = Boolean(error);
+  for (const invoice of data ?? []) {
+    try {
+      await uploadInvoicePdf(invoice, invoice.orders, invoice.pdf_path);
+    } catch {
+      failed = true;
+    }
+  }
+  if (failed) toast("Status tersimpan, tapi PDF di tautan pembeli belum diperbarui. Kirim ulang PDF.");
+}
+
 // Menu Bagikan tidak bisa memilih nomor tujuan, jadi admin memilih chat pembeli
 // sendiri. Browser tanpa berbagi file mengunduh PDF lalu membuka chat pembeli.
 // Hasil true berarti status tagihan berubah dan halaman perlu dimuat ulang.
-async function sendInvoicePdf(invoice, order, button, errorEl) {
+async function shareInvoicePdf(invoice, order, button, errorEl) {
   button.disabled = true;
   const caption = invoiceCaption(invoice, order);
   let shared;
@@ -911,7 +993,7 @@ function bindInvoiceActions(order, invoices, errorEl) {
   if (pdfButton) {
     invoicePdf(active, order).catch(() => {});
     pdfButton.addEventListener("click", async () => {
-      if (await sendInvoicePdf(active, order, pdfButton, errorEl)) reload();
+      if (await sendInvoiceLink(active, order, pdfButton, errorEl)) reload();
     });
   }
 
@@ -929,6 +1011,7 @@ function bindInvoiceActions(order, invoices, errorEl) {
     if (!window.confirm(`Batalkan tagihan ${active.code}? Pesanan tidak ikut dibatalkan.`)) return;
     if (await updateInvoice(active.id, { status: "batal" }, errorEl)) {
       toast("Tagihan dibatalkan");
+      refreshSentPdfs("id", active.id);
       reload();
     }
   });
@@ -937,6 +1020,7 @@ function bindInvoiceActions(order, invoices, errorEl) {
     if (!window.confirm(`Batalkan status lunas ${active.code}? Tagihan kembali ke Terkirim.`)) return;
     if (await updateInvoice(active.id, { status: "terkirim" }, errorEl)) {
       toast("Status lunas dibatalkan");
+      refreshSentPdfs("id", active.id);
       reload();
     }
   });
@@ -945,6 +1029,7 @@ function bindInvoiceActions(order, invoices, errorEl) {
     if (!window.confirm(`Batalkan ${active.code} dan buat tagihan baru dari isi pesanan sekarang?`)) return;
     event.currentTarget.disabled = true;
     if (!(await updateInvoice(active.id, { status: "batal" }, errorEl))) return;
+    refreshSentPdfs("id", active.id);
     const { error } = await supabase
       .from("invoices")
       .insert({ order_id: order.id, method: active.method, instructions: active.instructions });
@@ -991,6 +1076,7 @@ paidDialog.querySelector("form").addEventListener("submit", async (event) => {
 
   paidDialog.close();
   toast("Tagihan lunas");
+  refreshSentPdfs("id", state.paidInvoice.id);
   renderDetail(state.paidInvoice.orderId);
 });
 
@@ -1116,7 +1202,7 @@ async function renderInvoiceDoc(id) {
   app.innerHTML = `<p class="page muted">Memuat…</p>`;
   const { data: invoice, error } = await supabase
     .from("invoices")
-    .select("*, orders(code, customer_name, customer_phone, fulfillment, address, requested_at)")
+    .select(INVOICE_WITH_ORDER)
     .eq("id", id)
     .maybeSingle();
   if (seq !== renderSeq) return;
@@ -1162,12 +1248,13 @@ async function renderInvoiceDoc(id) {
           invoice.status === "batal"
             ? `<p class="notice error">Tagihan ini sudah dibatalkan. Jangan dikirim ke pembeli.</p>`
             : `<button class="btn primary full" type="button" data-invoice-pdf>${PDF_LABEL[invoice.status]}</button>
-              <p class="small muted">Di HP, pilih WhatsApp lalu chat pembeli. Di laptop, PDF diunduh dan chat pembeli terbuka.</p>`
+              <p class="small muted">Chat pembeli langsung terbuka dengan tautan PDF invoice ini.</p>`
         }
         <div class="row">
-          <button class="btn full" type="button" data-print>Cetak / Simpan PDF</button>
-          ${invoice.status === "draft" ? `<button class="btn full" type="button" data-mark-sent>Tandai terkirim</button>` : ""}
+          ${invoice.status === "batal" ? "" : `<button class="btn full" type="button" data-invoice-share>Bagikan file PDF</button>`}
+          <button class="btn full" type="button" data-print>Cetak</button>
         </div>
+        ${invoice.status === "draft" ? `<button class="btn full" type="button" data-mark-sent>Tandai terkirim</button>` : ""}
         <p class="error" data-error hidden></p>
       </div>
 
@@ -1230,10 +1317,14 @@ async function renderInvoiceDoc(id) {
   const errorEl = app.querySelector("[data-error]");
   app.querySelector("[data-print]").addEventListener("click", () => window.print());
   const pdfButton = app.querySelector("[data-invoice-pdf]");
+  const shareButton = app.querySelector("[data-invoice-share]");
   if (pdfButton) {
     invoicePdf(invoice, order).catch(() => {});
     pdfButton.addEventListener("click", async () => {
-      if (await sendInvoicePdf(invoice, order, pdfButton, errorEl)) renderInvoiceDoc(invoice.id);
+      if (await sendInvoiceLink(invoice, order, pdfButton, errorEl)) renderInvoiceDoc(invoice.id);
+    });
+    shareButton.addEventListener("click", async () => {
+      if (await shareInvoicePdf(invoice, order, shareButton, errorEl)) renderInvoiceDoc(invoice.id);
     });
   }
   const markSent = app.querySelector("[data-mark-sent]");

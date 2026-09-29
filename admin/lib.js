@@ -79,6 +79,7 @@ export function parseRupiah(value) {
 }
 
 const CONSTRAINT_MESSAGES = {
+  invoices_pdf_path_format: "Alamat PDF invoice tidak valid. Muat ulang halaman lalu coba lagi.",
   orders_address_for_delivery: "Alamat wajib diisi untuk pesanan antar.",
   orders_customer_phone_check: "Nomor WhatsApp tidak valid. Contoh: 0812 3456 7890.",
   orders_customer_name_check: "Nama pembeli wajib diisi.",
@@ -165,6 +166,13 @@ export const INVOICE_STAMP = { draft: "Belum dibayar", terkirim: "Belum dibayar"
 export function invoiceCaption(invoice, order) {
   const what = invoice.status === "lunas" ? `invoice lunas ${invoice.code}` : `invoice ${invoice.code}`;
   return `Halo Kak ${order.customer_name}, berikut ${what} untuk pesanan ${order.code} di Tetuti Kitchen. Total ${formatRp(invoice.total)}.`;
+}
+
+export function invoiceLinkMessage(invoice, order, url) {
+  let closing = "Setelah membayar, mohon kirim bukti pembayaran di chat ini. Terima kasih!";
+  if (invoice.status === "lunas") closing = "Pembayaran sudah kami terima. Terima kasih!";
+  else if (invoice.method === "tunai") closing = "Terima kasih!";
+  return [invoiceCaption(invoice, order), "", "Invoice (PDF):", url, "", closing].join("\n");
 }
 
 const PDF_REPLACEMENTS = { "‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "…": "...", "\u202f": " " };
