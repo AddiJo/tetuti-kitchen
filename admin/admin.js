@@ -38,8 +38,21 @@ const NEXT_LABEL = {
   diproses: "Tandai Siap",
   siap: "Tandai Selesai",
 };
-const FILTERS = ["aktif", ...FLOW, "batal"];
-const FILTER_LABEL = { aktif: "Aktif", ...STATUS_LABEL };
+const TABS = [
+  { id: "semua", label: "Semua", hint: "Semua pesanan, yang terbaru di atas." },
+  {
+    id: "baru",
+    label: "Baru",
+    hint: "Pesanan masuk. Hubungi pembeli untuk menyepakati harga, ongkir, dan jadwal, lalu konfirmasi.",
+  },
+  { id: "dikonfirmasi", label: "Dikonfirmasi", hint: "Sudah disepakati. Tandai Diproses saat mulai dibuat." },
+  { id: "diproses", label: "Diproses", hint: "Sedang dibuat. Tandai Siap kalau sudah bisa diantar atau diambil." },
+  { id: "siap", label: "Siap", hint: "Siap diantar atau diambil. Tandai Selesai setelah sampai ke pembeli." },
+  { id: "selesai", label: "Selesai", hint: "Pesanan sudah diterima pembeli." },
+  { id: "batal", label: "Dibatalkan", hint: "Pesanan yang dibatalkan, beserta alasannya." },
+];
+// Hanya status yang masih perlu dikerjakan diberi angka, seperti tab marketplace.
+const COUNTED = ["baru", "dikonfirmasi", "diproses", "siap"];
 
 const app = document.getElementById("app");
 const topbar = document.getElementById("topbar");
@@ -55,7 +68,7 @@ const state = {
   unseen: 0,
   knownIds: null,
   menu: [],
-  filter: "aktif",
+  filter: "semua",
   search: "",
   flash: null,
   cancelOrderId: null,
@@ -320,12 +333,13 @@ function renderList() {
       <h1>Pesanan</h1>
       <input class="input" type="search" data-search placeholder="Cari nama atau kode"
         aria-label="Cari nama atau kode pesanan" value="${esc(state.search)}" />
-      <div class="chips" role="group" aria-label="Filter status">
-        ${FILTERS.map(
-          (filter) => `<button type="button" class="chip" data-filter="${filter}"
-            aria-pressed="${filter === state.filter}">${FILTER_LABEL[filter]}</button>`
+      <div class="tabs" role="tablist" aria-label="Status pesanan">
+        ${TABS.map(
+          (tab) => `<button type="button" class="tab" role="tab" data-filter="${tab.id}"
+            aria-selected="${tab.id === state.filter}">${tab.label}<span class="count" data-count="${tab.id}"></span></button>`
         ).join("")}
       </div>
+      <p class="small muted" data-tab-hint></p>
       <div class="list" data-list><p class="muted">Memuat…</p></div>
       <div class="sticky-actions">
         <a class="btn primary full" href="#/baru">+ Catat pesanan</a>
@@ -346,17 +360,38 @@ function renderList() {
     }, 300);
   });
 
-  app.querySelectorAll("[data-filter]").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      state.filter = chip.dataset.filter;
-      app.querySelectorAll("[data-filter]").forEach((other) => {
-        other.setAttribute("aria-pressed", String(other === chip));
-      });
+  const hintEl = app.querySelector("[data-tab-hint]");
+  const selectTab = (tabEl) => {
+    app.querySelectorAll("[data-filter]").forEach((other) => {
+      other.setAttribute("aria-selected", String(other === tabEl));
+    });
+    hintEl.textContent = TABS.find((tab) => tab.id === state.filter).hint;
+    tabEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+
+  app.querySelectorAll("[data-filter]").forEach((tabEl) => {
+    tabEl.addEventListener("click", () => {
+      state.filter = tabEl.dataset.filter;
+      selectTab(tabEl);
       loadOrders(seq);
     });
   });
 
+  selectTab(app.querySelector(`[data-filter="${state.filter}"]`));
   loadOrders(seq);
+}
+
+async function loadCounts(seq) {
+  const { data, error } = await supabase.from("orders").select("status").in("status", COUNTED).limit(1000);
+  if (seq !== renderSeq || error) return;
+  const counts = Object.fromEntries(COUNTED.map((status) => [status, 0]));
+  data.forEach((row) => {
+    counts[row.status] += 1;
+  });
+  app.querySelectorAll("[data-count]").forEach((el) => {
+    const count = counts[el.dataset.count];
+    el.textContent = count ? ` (${count})` : "";
+  });
 }
 
 async function loadOrders(seq) {
@@ -367,8 +402,8 @@ async function loadOrders(seq) {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (state.filter === "aktif") query = query.not("status", "in", "(selesai,batal)");
-  else query = query.eq("status", state.filter);
+  if (state.filter !== "semua") query = query.eq("status", state.filter);
+  loadCounts(seq);
 
   // Karakter ini punya arti khusus di filter PostgREST.
   const term = state.search.replace(/[,()*%"\\]/g, " ").trim();
@@ -386,9 +421,9 @@ async function loadOrders(seq) {
     listEl.innerHTML = `<p class="empty">${
       term
         ? "Tidak ada pesanan yang cocok."
-        : state.filter === "aktif"
-          ? "Belum ada pesanan aktif. Pesanan dari situs muncul di sini; pesanan dari chat bisa dicatat lewat tombol di bawah."
-          : `Belum ada pesanan berstatus ${FILTER_LABEL[state.filter]}.`
+        : state.filter === "semua"
+          ? "Belum ada pesanan. Pesanan dari situs muncul di sini; pesanan dari chat bisa dicatat lewat tombol di bawah."
+          : `Tidak ada pesanan di tab ${TABS.find((tab) => tab.id === state.filter).label}.`
     }</p>`;
     return;
   }
