@@ -24,20 +24,18 @@ const LAST_ACTIVE_KEY = "tetuti-admin-last-active";
 const SOUND_KEY = "tetuti-admin-sound";
 const IDLE_MESSAGE = "Sesi habis karena 12 jam tidak dipakai. Silakan masuk lagi.";
 
-const FLOW = ["baru", "dikonfirmasi", "diproses", "siap", "selesai"];
+const FLOW = ["baru", "dikonfirmasi", "diproses", "selesai"];
 const STATUS_LABEL = {
   baru: "Baru",
   dikonfirmasi: "Dikonfirmasi",
   diproses: "Diproses",
-  siap: "Siap",
   selesai: "Selesai",
   batal: "Batal",
 };
 const NEXT_LABEL = {
   baru: "Konfirmasi pesanan",
   dikonfirmasi: "Tandai Diproses",
-  diproses: "Tandai Siap",
-  siap: "Tandai Selesai",
+  diproses: "Tandai Selesai",
 };
 const TABS = [
   { id: "semua", label: "Semua", hint: "Semua pesanan, yang terbaru di atas." },
@@ -47,13 +45,16 @@ const TABS = [
     hint: "Pesanan masuk. Hubungi pembeli untuk menyepakati harga, ongkir, dan jadwal, lalu konfirmasi.",
   },
   { id: "dikonfirmasi", label: "Dikonfirmasi", hint: "Sudah disepakati. Tandai Diproses saat mulai dibuat." },
-  { id: "diproses", label: "Diproses", hint: "Sedang dibuat. Tandai Siap kalau sudah bisa diantar atau diambil." },
-  { id: "siap", label: "Siap", hint: "Siap diantar atau diambil. Tandai Selesai setelah sampai ke pembeli." },
+  {
+    id: "diproses",
+    label: "Diproses",
+    hint: "Sedang dibuat atau menunggu diantar/diambil. Tandai Selesai setelah sampai ke pembeli.",
+  },
   { id: "selesai", label: "Selesai", hint: "Pesanan sudah diterima pembeli." },
   { id: "batal", label: "Dibatalkan", hint: "Pesanan yang dibatalkan, beserta alasannya." },
 ];
 // Hanya status yang masih perlu dikerjakan diberi angka, seperti tab marketplace.
-const COUNTED = ["baru", "dikonfirmasi", "diproses", "siap"];
+const COUNTED = ["baru", "dikonfirmasi", "diproses"];
 
 const app = document.getElementById("app");
 const topbar = document.getElementById("topbar");
@@ -597,7 +598,7 @@ function progressHtml(pos) {
       ${FLOW.map((status, index) => `<span class="${index <= pos ? "done" : ""}"></span>`).join("")}
     </div>
     <div class="step-labels">
-      <span>Baru</span><span>Konfirmasi</span><span>Proses</span><span>Siap</span><span>Selesai</span>
+      <span>Baru</span><span>Konfirmasi</span><span>Proses</span><span>Selesai</span>
     </div>`;
 }
 
@@ -612,8 +613,8 @@ function itemLine(item) {
 
 function actionsHtml(order, pos) {
   if (order.status === "selesai") {
-    return `<button class="btn full" type="button" data-status="siap"
-      data-confirm="Buka kembali pesanan ini ke status Siap?">Buka kembali</button>`;
+    return `<button class="btn full" type="button" data-status="diproses"
+      data-confirm="Buka kembali pesanan ini ke status Diproses?">Buka kembali</button>`;
   }
   if (order.status === "batal") {
     return `<button class="btn full" type="button" data-status="baru"

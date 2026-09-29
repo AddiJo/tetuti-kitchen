@@ -419,10 +419,6 @@ textarea.input,
   color: var(--info);
 }
 
-.s-siap {
-  color: var(--ok);
-}
-
 .s-selesai,
 .s-batal {
   color: var(--muted);

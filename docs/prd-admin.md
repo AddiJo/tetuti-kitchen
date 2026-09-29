@@ -115,12 +115,13 @@ Tetap ada untuk pembeli yang langsung chat tanpa lewat situs. Isiannya sama deng
 
 1. Baru — pesanan masuk, harga, ongkir, atau jadwal belum dikonfirmasi.
 2. Dikonfirmasi — harga, ongkir, dan jadwal sudah disepakati.
-3. Diproses — sedang dibuat.
-4. Siap — siap diantar atau diambil.
-5. Selesai.
-6. Batal — wajib isi alasan. Pesanan batal tidak masuk omzet.
+3. Diproses — sedang dibuat atau menunggu diantar/diambil.
+4. Selesai — sudah sampai ke pembeli.
+5. Batal — wajib isi alasan. Pesanan batal tidak masuk omzet.
 
-Status maju atau mundur satu langkah. Selesai dibuka kembali ke Siap, Batal ke Baru. Pesanan tidak bisa dikonfirmasi sebelum semua item punya harga.
+Status maju atau mundur satu langkah. Selesai dibuka kembali ke Diproses, Batal ke Baru. Pesanan tidak bisa dikonfirmasi sebelum semua item punya harga. Status Siap dihapus atas permintaan pemilik (29 Sep 2026); Diproses langsung ke Selesai.
+
+Daftar pesanan memakai tab seperti marketplace: Semua, Baru, Dikonfirmasi, Diproses, Selesai, Dibatalkan. Tab yang masih perlu dikerjakan diberi jumlah, dan di bawah tab ada keterangan arti status.
 
 ### Masuk dan keluar akun
 
@@ -144,7 +145,7 @@ Teks kartu, badge, dan foto pindah dari `js/products.js` ke database.
 
 ### Buat tagihan bayar
 
-Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, Siap, atau Selesai.
+Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
 - Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan.
