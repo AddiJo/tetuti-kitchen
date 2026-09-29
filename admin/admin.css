@@ -395,6 +395,50 @@ textarea.input,
   background: var(--brand);
 }
 
+.tag.paid {
+  background: var(--ok);
+}
+
+.tag.unpaid {
+  background: var(--warn);
+}
+
+.i-draft {
+  color: var(--muted);
+}
+
+.i-terkirim {
+  color: var(--warn);
+}
+
+.i-lunas {
+  color: var(--ok);
+  background: #e6f2e8;
+}
+
+.i-batal {
+  color: var(--danger);
+  background: #fbe7e7;
+}
+
+.invoice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.wa-preview {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .order.unseen {
   border-color: var(--brand);
   box-shadow: inset 4px 0 0 var(--brand);

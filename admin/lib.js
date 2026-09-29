@@ -87,6 +87,11 @@ const CONSTRAINT_MESSAGES = {
   menu_items_description_check: "Deskripsi maksimal 300 karakter.",
   menu_items_highlights_check: "Sorotan maksimal 3, masing-masing maksimal 60 karakter.",
   menu_items_image_url_check: "Alamat foto tidak dikenali. Unggah ulang fotonya.",
+  invoices_instructions_required: "Isi instruksi bayar, misalnya nomor rekening tujuan.",
+  invoices_instructions_check: "Instruksi bayar maksimal 500 karakter.",
+  invoices_paid_fields: "Isi nominal yang diterima dan waktu lunas.",
+  invoices_paid_amount_check: "Nominal yang diterima harus lebih dari Rp0.",
+  invoices_one_active: "Pesanan ini sudah punya tagihan aktif. Batalkan dulu tagihan lama.",
   order_items_menu_item_id_fkey:
     "Menu ini sudah pernah dipesan, jadi tidak bisa dihapus. Hapus centang Tampilkan di situs untuk menyembunyikannya.",
 };
@@ -108,6 +113,42 @@ export function uniqueSlug(name, taken) {
   let slug = base;
   for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
   return slug;
+}
+
+export const METHOD_LABEL = { transfer: "Transfer bank", qris: "QRIS", tunai: "Tunai" };
+export const INVOICE_STATUS_LABEL = { draft: "Draft", terkirim: "Terkirim", lunas: "Lunas", batal: "Batal" };
+
+// Baris item dengan bentuk yang sama seperti salinan database di invoices.lines.
+export function invoiceLines(items) {
+  return items.map((item) => ({ name: item.name, quantity: item.quantity, unit_price: item.unit_price }));
+}
+
+export function invoiceMessage(invoice, order) {
+  const lines = invoice.lines.map(
+    (line) =>
+      `${line.quantity}× ${line.name} @ ${formatRp(line.unit_price)} = ${formatRp(line.quantity * line.unit_price)}`
+  );
+  return [
+    `Halo Kak ${order.customer_name}, berikut tagihan pesanan Tetuti Kitchen.`,
+    "",
+    `Tagihan: ${invoice.code}`,
+    `Pesanan: ${order.code}`,
+    "",
+    ...lines,
+    ...(invoice.shipping_fee ? [`Ongkir: ${formatRp(invoice.shipping_fee)}`] : []),
+    `*Total: ${formatRp(invoice.total)}*`,
+    "",
+    `Cara bayar: ${METHOD_LABEL[invoice.method]}`,
+    ...(invoice.instructions ? [invoice.instructions] : []),
+    "",
+    invoice.method === "tunai"
+      ? "Terima kasih!"
+      : "Setelah membayar, mohon kirim bukti pembayaran di chat ini. Terima kasih!",
+  ].join("\n");
+}
+
+export function waLink(phone, text) {
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
 // Foto bawaan tersimpan sebagai "assets/…" relatif terhadap situs.

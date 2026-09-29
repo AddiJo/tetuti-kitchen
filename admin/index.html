@@ -52,6 +52,26 @@
       </form>
     </dialog>
 
+    <dialog id="paid-dialog">
+      <form method="dialog" class="stack">
+        <h2>Tandai lunas</h2>
+        <p class="small muted">Total tagihan <span data-total></span>.</p>
+        <label class="field">
+          <span>Nominal diterima</span>
+          <input class="input" name="amount" inputmode="numeric" />
+        </label>
+        <label class="field">
+          <span>Waktu lunas</span>
+          <input class="input" name="paid_at" type="datetime-local" />
+        </label>
+        <p class="error" data-error hidden></p>
+        <div class="row">
+          <button class="btn" type="submit" value="back" formnovalidate>Kembali</button>
+          <button class="btn primary full" type="submit" value="confirm">Tandai lunas</button>
+        </div>
+      </form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
     <noscript><p class="page">Halaman admin butuh JavaScript.</p></noscript>

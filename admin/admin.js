@@ -7,14 +7,19 @@ import {
   formatDate,
   formatRp,
   fromJakartaInput,
+  INVOICE_STATUS_LABEL,
+  invoiceLines,
+  invoiceMessage,
   isValidPhone,
   loginErrorMessage,
   menuImageSrc,
+  METHOD_LABEL,
   normalizePhone,
   parseRupiah,
   priceLabel,
   toJakartaInput,
   uniqueSlug,
+  waLink,
 } from "./lib.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -62,6 +67,7 @@ const app = document.getElementById("app");
 const topbar = document.getElementById("topbar");
 const toastEl = document.getElementById("toast");
 const cancelDialog = document.getElementById("cancel-dialog");
+const paidDialog = document.getElementById("paid-dialog");
 const soundToggle = document.getElementById("sound-toggle");
 
 const BASE_TITLE = document.title;
@@ -77,6 +83,7 @@ const state = {
   search: "",
   flash: null,
   cancelOrderId: null,
+  paidInvoice: null,
 };
 
 // Setiap render menaikkan nomor ini; hasil fetch yang datang setelah pindah
@@ -439,10 +446,18 @@ async function loadOrders(seq) {
     return;
   }
 
-  listEl.innerHTML = data.map(orderCard).join("");
+  const { data: bills } = await supabase
+    .from("invoices")
+    .select("order_id, status")
+    .in("order_id", data.map((order) => order.id))
+    .in("status", ["terkirim", "lunas"]);
+  if (seq !== renderSeq || mine !== listSeq) return;
+  const billStatus = new Map((bills ?? []).map((bill) => [bill.order_id, bill.status]));
+
+  listEl.innerHTML = data.map((order) => orderCard(order, billStatus.get(order.id))).join("");
 }
 
-function orderCard(order) {
+function orderCard(order, bill) {
   const details = [
     order.items_label || "Belum ada item",
     order.fulfillment === "antar" ? "Antar" : "Pickup",
@@ -463,7 +478,13 @@ function orderCard(order) {
       </span>
       <span class="small">${esc(details.join(" · "))}</span>
       <span class="row between small">
-        <span class="row"><span class="code">${esc(order.code)}</span>${order.source === "situs" ? `<span class="tag">Situs</span>` : ""}</span>
+        <span class="row"><span class="code">${esc(order.code)}</span>${order.source === "situs" ? `<span class="tag">Situs</span>` : ""}${
+          bill === "lunas"
+            ? `<span class="tag paid">Lunas</span>`
+            : bill === "terkirim"
+              ? `<span class="tag unpaid">Belum bayar</span>`
+              : ""
+        }</span>
         ${total}
       </span>
     </a>`;
@@ -478,7 +499,12 @@ async function fetchOrder(id) {
     .eq("id", id)
     .maybeSingle();
   if (result.data) {
-    result.data.order_items.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    // Urutan sama dengan salinan item di tagihan (created_at, lalu id).
+    const key = (item) => [item.created_at, item.id];
+    result.data.order_items.sort((a, b) => {
+      const [x, y] = [key(a), key(b)];
+      return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0;
+    });
   }
   return result;
 }
@@ -486,7 +512,10 @@ async function fetchOrder(id) {
 async function renderDetail(id) {
   const seq = ++renderSeq;
   app.innerHTML = `<p class="page muted">Memuat…</p>`;
-  const { data: order, error } = await fetchOrder(id);
+  const [{ data: order, error }, { data: invoices, error: invoiceError }] = await Promise.all([
+    fetchOrder(id),
+    fetchInvoices(id),
+  ]);
   if (seq !== renderSeq) return;
   if (error) return renderProblem(errorMessage(error));
   if (!order) return renderProblem("Pesanan tidak ditemukan.");
@@ -541,6 +570,11 @@ async function renderDetail(id) {
         </div>
       </div>
       ${
+        invoiceError
+          ? `<p class="notice error">Tagihan gagal dimuat. ${esc(errorMessage(invoiceError))}</p>`
+          : invoiceSection(order, invoices, total)
+      }
+      ${
         order.note
           ? `<div class="card"><span class="label">Catatan</span><p class="note">${esc(order.note)}</p></div>`
           : ""
@@ -578,6 +612,8 @@ async function renderDetail(id) {
       await changeStatus(order.id, { status: next }, errorEl);
     });
   });
+
+  if (!invoiceError) bindInvoiceActions(order, invoices, errorEl);
 
   const cancelButton = app.querySelector("[data-cancel]");
   if (cancelButton) {
@@ -666,6 +702,323 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
   toast("Pesanan dibatalkan");
   renderDetail(state.cancelOrderId);
 });
+
+// Tagihan --------------------------------------------------------------------
+
+const INVOICE_ELIGIBLE = ["dikonfirmasi", "diproses", "selesai"];
+const INSTRUCTION_HINT = {
+  transfer: "BCA 1234567890 a.n. Nama Pemilik",
+  qris: "Kode QRIS kami kirim di chat ini.",
+  tunai: "Dibayar saat pickup atau saat diantar.",
+};
+
+function fetchInvoices(orderId) {
+  return supabase
+    .from("invoices")
+    .select("*")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false });
+}
+
+function invoicePill(status) {
+  return `<span class="status i-${status}">${INVOICE_STATUS_LABEL[status]}</span>`;
+}
+
+function orderTotal(order) {
+  const items = order.order_items;
+  if (items.length === 0 || items.some((item) => item.unit_price == null)) return null;
+  return items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0) + order.shipping_fee;
+}
+
+// Tagihan menyimpan salinan isi pesanan. Kalau pesanan diubah sesudahnya,
+// admin diminta membuat ulang tagihan supaya pembeli tidak menerima angka lama.
+function invoiceOutdated(invoice, order) {
+  return (
+    invoice.shipping_fee !== order.shipping_fee ||
+    JSON.stringify(invoice.lines) !== JSON.stringify(invoiceLines(order.order_items))
+  );
+}
+
+function invoiceSection(order, invoices, total) {
+  const active = invoices.find((invoice) => invoice.status !== "batal");
+  const cancelled = invoices.filter((invoice) => invoice.status === "batal");
+  const eligible = INVOICE_ELIGIBLE.includes(order.status);
+  if (!active && !cancelled.length && order.status === "batal") return "";
+
+  let body;
+  if (active) {
+    body = activeInvoiceHtml(active, order, total);
+  } else if (!eligible) {
+    body = `<p class="small muted">Konfirmasi pesanan dulu, baru tagihan bisa dibuat.</p>`;
+  } else {
+    body = `
+      <p class="small muted">Belum ada tagihan. Tagihan berisi item, ongkir, total, dan cara bayar,
+        lalu dikirim ke WhatsApp pembeli.</p>
+      <a class="btn primary" href="#/pesanan/${esc(order.id)}/tagihan">Buat tagihan</a>`;
+  }
+
+  const history = cancelled.length
+    ? `<p class="small muted">Tagihan dibatalkan: ${cancelled.map((invoice) => esc(invoice.code)).join(", ")}</p>`
+    : "";
+
+  return `
+    <div class="card invoice">
+      <div class="row between">
+        <span class="label">Tagihan</span>
+        ${active ? invoicePill(active.status) : ""}
+      </div>
+      ${body}
+      ${history}
+    </div>`;
+}
+
+function activeInvoiceHtml(invoice, order, total) {
+  const send = waLink(order.customer_phone, invoiceMessage(invoice, order));
+  const outdated =
+    invoice.status !== "lunas" && invoiceOutdated(invoice, order)
+      ? `<p class="notice">Isi pesanan berubah sejak tagihan dibuat${
+          total == null ? "" : ` (total sekarang ${esc(formatRp(total))})`
+        }. Buat ulang supaya pembeli menerima angka terbaru.</p>
+        <button class="btn" type="button" data-invoice-redo>Buat ulang tagihan</button>`
+      : "";
+
+  let meta;
+  let actions;
+  if (invoice.status === "draft") {
+    meta = "Belum dikirim ke pembeli.";
+    actions = `
+      <a class="btn primary" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim lewat WhatsApp</a>
+      <a class="btn" href="#/pesanan/${esc(order.id)}/tagihan">Ubah</a>
+      <button class="btn" type="button" data-invoice-paid>Tandai lunas</button>
+      <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
+  } else if (invoice.status === "terkirim") {
+    meta = `Dikirim ${esc(formatDate(invoice.sent_at))}. Menunggu pembayaran.`;
+    actions = `
+      <button class="btn primary" type="button" data-invoice-paid>Tandai lunas</button>
+      <a class="btn" href="${esc(send)}" target="_blank" rel="noopener" data-invoice-send>Kirim ulang</a>
+      <button class="btn ghost" type="button" data-invoice-cancel>Batalkan tagihan</button>`;
+  } else {
+    const differs = invoice.paid_amount !== invoice.total ? ` dari tagihan ${esc(formatRp(invoice.total))}` : "";
+    meta = `Diterima ${esc(formatRp(invoice.paid_amount))}${differs} · ${esc(formatDate(invoice.paid_at))}.`;
+    actions = `<button class="btn ghost" type="button" data-invoice-unpay>Batalkan lunas…</button>`;
+  }
+
+  return `
+    <div class="line"><span class="code">${esc(invoice.code)}</span><strong>${esc(formatRp(invoice.total))}</strong></div>
+    <span class="small">${esc(METHOD_LABEL[invoice.method])}${
+      invoice.instructions ? ` · ${esc(invoice.instructions)}` : ""
+    }</span>
+    <span class="small muted">${meta}</span>
+    ${outdated}
+    <div class="invoice-actions">${actions}</div>`;
+}
+
+async function updateInvoice(invoiceId, changes, errorEl) {
+  const { error } = await supabase.from("invoices").update(changes).eq("id", invoiceId);
+  if (error) showError(errorEl, errorMessage(error));
+  return !error;
+}
+
+function bindInvoiceActions(order, invoices, errorEl) {
+  const active = invoices.find((invoice) => invoice.status !== "batal");
+  if (!active) return;
+  const reload = () => renderDetail(order.id);
+
+  // Tautan WhatsApp dibuka browser seperti biasa; status dicatat di belakangnya.
+  app.querySelector("[data-invoice-send]")?.addEventListener("click", async () => {
+    const changes =
+      active.status === "draft" ? { status: "terkirim" } : { sent_at: new Date().toISOString() };
+    if (await updateInvoice(active.id, changes, errorEl)) {
+      toast(active.status === "draft" ? "Tagihan ditandai terkirim" : "Tagihan dikirim ulang");
+      reload();
+    }
+  });
+
+  app.querySelector("[data-invoice-cancel]")?.addEventListener("click", async () => {
+    if (!window.confirm(`Batalkan tagihan ${active.code}? Pesanan tidak ikut dibatalkan.`)) return;
+    if (await updateInvoice(active.id, { status: "batal" }, errorEl)) {
+      toast("Tagihan dibatalkan");
+      reload();
+    }
+  });
+
+  app.querySelector("[data-invoice-unpay]")?.addEventListener("click", async () => {
+    if (!window.confirm(`Batalkan status lunas ${active.code}? Tagihan kembali ke Terkirim.`)) return;
+    if (await updateInvoice(active.id, { status: "terkirim" }, errorEl)) {
+      toast("Status lunas dibatalkan");
+      reload();
+    }
+  });
+
+  app.querySelector("[data-invoice-redo]")?.addEventListener("click", async (event) => {
+    if (!window.confirm(`Batalkan ${active.code} dan buat tagihan baru dari isi pesanan sekarang?`)) return;
+    event.currentTarget.disabled = true;
+    if (!(await updateInvoice(active.id, { status: "batal" }, errorEl))) return;
+    const { error } = await supabase
+      .from("invoices")
+      .insert({ order_id: order.id, method: active.method, instructions: active.instructions });
+    if (error) {
+      state.flash = {
+        tone: "error",
+        text: `Tagihan lama dibatalkan, tapi tagihan baru gagal dibuat: ${errorMessage(error)}`,
+      };
+    } else {
+      toast("Tagihan baru dibuat. Kirim ulang ke pembeli.");
+    }
+    reload();
+  });
+
+  app.querySelector("[data-invoice-paid]")?.addEventListener("click", () => {
+    state.paidInvoice = { id: active.id, orderId: order.id };
+    const form = paidDialog.querySelector("form");
+    form.reset();
+    form.elements.amount.value = String(active.total);
+    form.elements.paid_at.value = toJakartaInput(new Date().toISOString());
+    form.querySelector("[data-total]").textContent = formatRp(active.total);
+    form.querySelector("[data-error]").hidden = true;
+    paidDialog.showModal();
+  });
+}
+
+paidDialog.querySelector("form").addEventListener("submit", async (event) => {
+  if (event.submitter?.value !== "confirm") return;
+  event.preventDefault();
+  const form = event.currentTarget;
+  const errorEl = form.querySelector("[data-error]");
+  const amount = parseRupiah(form.elements.amount.value);
+  const paidAt = fromJakartaInput(form.elements.paid_at.value);
+  if (!amount || amount < 1) return showError(errorEl, "Isi nominal yang diterima.");
+  if (!paidAt) return showError(errorEl, "Isi waktu lunas.");
+
+  event.submitter.disabled = true;
+  const { error } = await supabase
+    .from("invoices")
+    .update({ status: "lunas", paid_amount: amount, paid_at: paidAt })
+    .eq("id", state.paidInvoice.id);
+  event.submitter.disabled = false;
+  if (error) return showError(errorEl, errorMessage(error));
+
+  paidDialog.close();
+  toast("Tagihan lunas");
+  renderDetail(state.paidInvoice.orderId);
+});
+
+async function renderInvoiceForm(orderId) {
+  const seq = ++renderSeq;
+  const back = `#/pesanan/${orderId}`;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const [{ data: order, error }, { data: invoices, error: invoiceError }] = await Promise.all([
+    fetchOrder(orderId),
+    fetchInvoices(orderId),
+  ]);
+  if (seq !== renderSeq) return;
+  if (error || invoiceError) return renderProblem(errorMessage(error || invoiceError), back);
+  if (!order) return renderProblem("Pesanan tidak ditemukan.");
+
+  const active = invoices.find((invoice) => invoice.status !== "batal");
+  if (active && active.status !== "draft") {
+    return renderProblem(
+      "Tagihan ini sudah dikirim, jadi cara bayarnya tidak bisa diubah. Batalkan tagihan dulu kalau perlu membuat yang baru.",
+      back
+    );
+  }
+  const total = orderTotal(order);
+  if (!active && !INVOICE_ELIGIBLE.includes(order.status)) {
+    return renderProblem("Tagihan hanya bisa dibuat untuk pesanan yang sudah dikonfirmasi.", back);
+  }
+  if (!active && total == null) {
+    return renderProblem("Isi harga semua item dulu, baru tagihan bisa dibuat.", back);
+  }
+
+  const draft = active ?? {
+    code: "INV-…",
+    lines: invoiceLines(order.order_items),
+    shipping_fee: order.shipping_fee,
+    total,
+    method: "transfer",
+    instructions: null,
+  };
+
+  app.innerHTML = `
+    <section class="page has-actions">
+      <a class="back" href="${esc(back)}">‹ Detail</a>
+      <h1>${active ? `Ubah <span class="code">${esc(active.code)}</span>` : "Buat tagihan"}</h1>
+      <p class="small muted">
+        Pesanan <span class="code">${esc(order.code)}</span> · ${esc(order.customer_name)} · Total ${esc(formatRp(draft.total))}
+      </p>
+      <form id="invoice-form" class="stack" novalidate>
+        <fieldset class="seg">
+          <legend class="sr-only">Cara bayar</legend>
+          ${Object.entries(METHOD_LABEL)
+            .map(
+              ([value, label]) =>
+                `<label><input type="radio" name="method" value="${value}" /> <span>${label}</span></label>`
+            )
+            .join("")}
+        </fieldset>
+        <label class="field">
+          <span data-instructions-label>Instruksi bayar</span>
+          <textarea class="input" name="instructions" rows="3" maxlength="500"></textarea>
+        </label>
+        <div class="field">
+          <span>Pesan yang akan terkirim ke WhatsApp pembeli</span>
+          <pre class="wa-preview" data-preview></pre>
+          ${active ? "" : `<span class="small muted">Nomor tagihan dibuat saat disimpan.</span>`}
+        </div>
+        <p class="error" data-error hidden></p>
+        <div class="sticky-actions">
+          <button class="btn primary full" type="submit">Simpan sebagai draft</button>
+        </div>
+      </form>
+    </section>`;
+
+  const form = app.querySelector("#invoice-form");
+  const fields = form.elements;
+  const errorEl = form.querySelector("[data-error]");
+  const previewEl = form.querySelector("[data-preview]");
+  const labelEl = form.querySelector("[data-instructions-label]");
+  fields.method.value = draft.method;
+  fields.instructions.value = draft.instructions ?? "";
+
+  const read = () => ({
+    method: fields.method.value,
+    instructions: fields.instructions.value.trim() || null,
+  });
+  const sync = () => {
+    const { method, instructions } = read();
+    fields.instructions.placeholder = INSTRUCTION_HINT[method];
+    labelEl.textContent = method === "tunai" ? "Instruksi bayar (opsional)" : "Instruksi bayar";
+    previewEl.textContent = invoiceMessage({ ...draft, method, instructions }, order);
+  };
+  form.addEventListener("input", sync);
+  form.addEventListener("change", sync);
+  sync();
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+    const values = read();
+    if (values.method !== "tunai" && !values.instructions) {
+      return showError(
+        errorEl,
+        values.method === "transfer"
+          ? "Isi rekening tujuan, misalnya BCA 1234567890 a.n. Nama Pemilik."
+          : "Isi instruksi bayar, misalnya bahwa kode QRIS dikirim di chat."
+      );
+    }
+
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    const { error: saveError } = active
+      ? await supabase.from("invoices").update(values).eq("id", active.id)
+      : await supabase.from("invoices").insert({ ...values, order_id: order.id });
+    submit.disabled = false;
+    if (saveError) return showError(errorEl, errorMessage(saveError));
+
+    toast(active ? "Tagihan disimpan" : "Tagihan dibuat. Kirim ke pembeli dari halaman detail.");
+    if (seq === renderSeq) location.hash = back;
+  });
+}
 
 // Catat dan ubah pesanan ------------------------------------------------------
 
@@ -1358,6 +1711,7 @@ function route() {
   if (path === "/baru") return renderForm(null);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}$`)))) return renderDetail(match[1]);
   if ((match = path.match(new RegExp(`^/pesanan/${uuid}/ubah$`)))) return renderForm(match[1]);
+  if ((match = path.match(new RegExp(`^/pesanan/${uuid}/tagihan$`)))) return renderInvoiceForm(match[1]);
   location.hash = "#/";
 }
 

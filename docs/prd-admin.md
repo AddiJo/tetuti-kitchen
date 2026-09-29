@@ -157,6 +157,19 @@ Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 Status tagihan: Draft, Terkirim, Lunas, Batal.
 
+Aturan yang dijaga database:
+
+- Kode `INV-DDMMYYYY-NN`, urut per hari Jakarta. Item, ongkir, dan total disalin saat tagihan dibuat dan tidak bisa diubah. Semua item harus sudah punya harga.
+- Transfer dan QRIS wajib punya instruksi. Cara bayar dan instruksi hanya bisa diubah selama Draft.
+- Tagihan batal tidak bisa dihidupkan lagi; buat tagihan baru.
+- Pesanan dibatalkan: tagihan Draft dan Terkirim ikut batal. Pesanan dengan tagihan lunas tidak bisa dibatalkan, dan item serta ongkirnya tidak bisa diubah, sampai lunasnya dibatalkan.
+
+Di admin:
+
+- Tombol Kirim lewat WhatsApp membuka chat pembeli dan menandai tagihan Terkirim. Kirim ulang membuka chat yang sama.
+- Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
+- Daftar pesanan memberi label Belum bayar (tagihan terkirim) atau Lunas.
+
 ## Fase 3 — Sandi dan laporan
 
 ### Atur ulang sandi
@@ -258,4 +271,8 @@ Fase 2, langkah 1 — kelola menu:
 - [x] Agen: hapus menu yang belum pernah dipesan (migrasi `20260929030000_hapus_menu.sql`).
 - [ ] Pemilik: jalankan migrasi hapus menu, push, lalu hapus menu uji.
 
-Fase 2, langkah 2 — tagihan: dikerjakan setelah kelola menu, mengikuti urutan fase (keputusan pemilik, 29 Sep 2026). Sumber instruksi bayar belum diputuskan.
+Fase 2, langkah 2 — tagihan:
+
+- [x] Agen: migrasi `20260929040000_tagihan.sql` (tabel `invoices`, kode, salinan isi, aturan status, kaitan dengan pesanan batal dan lunas); halaman buat tagihan, kirim WhatsApp, tandai lunas, batalkan lunas.
+- [ ] Pemilik: jalankan migrasi tagihan sebelum push.
+- [ ] Pemilik: push, lalu uji satu tagihan ke nomor sendiri sampai lunas.
