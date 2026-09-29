@@ -142,6 +142,7 @@ Teks kartu, badge, dan foto pindah dari `js/products.js` ke database. `js/produc
 - Tambah menu: nama, kategori (camilan, hantaran, catering), badge, kalimat singkat, deskripsi, tiga sorotan, harga, satuan. Hanya nama yang wajib. Nama menjadi alamat tetap menu (`sambal-crispy`); mengganti nama kemudian tidak mengubah alamat itu.
 - Upload foto: JPG atau PNG. Admin mengecilkan foto ke sisi terpanjang 1200 px dan mengubahnya ke JPG sebelum diunggah ke bucket `menu-foto`. Foto baru diunggah dulu; menu baru disimpan kalau unggahan berhasil, lalu foto lama dihapus. Foto yang gagal diunggah tidak menghapus foto lama.
 - Sembunyikan menu: hilang dari situs, pesanan lama tetap menampilkan namanya.
+- Hapus menu: hanya untuk menu yang belum pernah dipesan (misalnya menu uji), beserta fotonya. Menu yang sudah ada di pesanan ditolak database dan cukup disembunyikan, supaya riwayat pesanan dan laporan menu terlaris tetap utuh. (Permintaan pemilik, 29 Sep 2026.)
 - Urutan: tombol naik/turun di daftar menu, sama dengan urutan kartu di situs.
 - Harga diubah dari halaman ubah menu (dulu satu halaman harga untuk semua menu).
 
@@ -252,7 +253,9 @@ Langkah 3 — bunyi pesanan baru:
 Fase 2, langkah 1 — kelola menu:
 
 - [x] Agen: migrasi teks kartu, foto, bucket `menu-foto` dan aksesnya; halaman daftar, tambah, dan ubah menu; situs membaca kartu dari database.
-- [ ] Pemilik: jalankan migrasi `20260929020000_kelola_menu.sql` **sebelum** push. Kalau kode tayang lebih dulu, situs jatuh ke kartu cadangan dan harga tertulis “Harga via WhatsApp” sampai migrasi dijalankan.
-- [ ] Pemilik: push, lalu uji ganti foto satu menu dan tambah satu menu uji (sembunyikan lagi setelahnya).
+- [x] Pemilik: jalankan migrasi `20260929020000_kelola_menu.sql` sebelum push.
+- [x] Pemilik: push, lalu uji ganti foto dan tambah menu. Tampil di situs (29 Sep 2026).
+- [x] Agen: hapus menu yang belum pernah dipesan (migrasi `20260929030000_hapus_menu.sql`).
+- [ ] Pemilik: jalankan migrasi hapus menu, push, lalu hapus menu uji.
 
 Fase 2, langkah 2 — tagihan: dikerjakan setelah kelola menu, mengikuti urutan fase (keputusan pemilik, 29 Sep 2026). Sumber instruksi bayar belum diputuskan.

@@ -271,6 +271,11 @@ textarea.input,
   color: #fff;
 }
 
+.btn.danger-outline {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .btn.ghost {
   border-color: var(--line);
   color: var(--muted);

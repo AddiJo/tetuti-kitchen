@@ -1101,6 +1101,23 @@ async function renderMenuForm(id) {
   if (id && !menu) return renderProblem("Menu tidak ditemukan.", "#/menu");
   const highlights = [0, 1, 2].map((index) => menu?.highlights?.[index] ?? "");
 
+  // Menu yang sudah ada di pesanan ditolak database kalau dihapus.
+  let orderedCount = 0;
+  if (menu) {
+    const { count } = await supabase
+      .from("order_items")
+      .select("id", { count: "exact", head: true })
+      .eq("menu_item_id", menu.id);
+    if (seq !== renderSeq) return;
+    orderedCount = count ?? 0;
+  }
+  const deleteHtml = !menu
+    ? ""
+    : orderedCount > 0
+      ? `<p class="small muted">Menu ini ada di ${orderedCount} item pesanan, jadi tidak bisa dihapus.
+          Hapus centang Tampilkan di situs untuk menyembunyikannya.</p>`
+      : `<button class="btn danger-outline full" type="button" data-delete>Hapus menu…</button>`;
+
   app.innerHTML = `
     <section class="page has-actions">
       <a class="back" href="#/menu">‹ Menu</a>
@@ -1167,6 +1184,7 @@ async function renderMenuForm(id) {
           <input type="checkbox" name="is_active" />
           <span>Tampilkan di situs</span>
         </label>
+        ${deleteHtml}
         <p class="error" data-error hidden></p>
         <div class="sticky-actions">
           <button class="btn primary full" type="submit">${menu ? "Simpan perubahan" : "Tambah menu"}</button>
@@ -1227,6 +1245,25 @@ async function renderMenuForm(id) {
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     photoUrl = URL.createObjectURL(photoBlob);
     showPhoto(photoUrl);
+  });
+
+  form.querySelector("[data-delete]")?.addEventListener("click", async (event) => {
+    if (!window.confirm(`Hapus ${menu.name}? Menu dan fotonya hilang permanen.`)) return;
+    errorEl.hidden = true;
+    const button = event.currentTarget;
+    button.disabled = true;
+    const { data, error } = await supabase.from("menu_items").delete().eq("id", menu.id).select("id");
+    if (error || data.length === 0) {
+      button.disabled = false;
+      return showError(errorEl, error ? errorMessage(error) : "Menu tidak terhapus. Muat ulang lalu coba lagi.");
+    }
+    const path = photoPath(menu.image_url);
+    if (path) await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+
+    await loadMenu();
+    toast("Menu dihapus");
+    if (seq === renderSeq) location.hash = "#/menu";
   });
 
   form.addEventListener("submit", async (event) => {

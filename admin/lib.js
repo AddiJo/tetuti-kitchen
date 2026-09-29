@@ -87,6 +87,8 @@ const CONSTRAINT_MESSAGES = {
   menu_items_description_check: "Deskripsi maksimal 300 karakter.",
   menu_items_highlights_check: "Sorotan maksimal 3, masing-masing maksimal 60 karakter.",
   menu_items_image_url_check: "Alamat foto tidak dikenali. Unggah ulang fotonya.",
+  order_items_menu_item_id_fkey:
+    "Menu ini sudah pernah dipesan, jadi tidak bisa dihapus. Hapus centang Tampilkan di situs untuk menyembunyikannya.",
 };
 
 // Nama menu menjadi alamat tetap menu itu, misalnya "Sambal Crispy" -> "sambal-crispy".
