@@ -285,6 +285,7 @@ Fase 2, langkah 2 — tagihan:
 - [x] Agen: kirim invoice sebagai PDF lewat menu Bagikan, teks sebagai cadangan (tanpa migrasi).
 - [x] Agen: kirim tautan PDF langsung ke nomor pembeli (migrasi `20260929050000_invoice_pdf.sql`, rewrite `/i/…` di `vercel.json`).
 - [x] Pemilik: jalankan migrasi invoice PDF, push, dan uji kirim tautan PDF ke WhatsApp (29 Sep 2026). Rewrite `/i/…` di produksi meneruskan ke Supabase Storage dengan `noindex`.
-- [ ] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas.
+- [x] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas (29 Sep 2026).
+- [x] Agen: kartu tagihan dirapikan (tombol utama, sisanya di Lainnya) dan rekening BRI jadi instruksi bawaan. Diuji pemilik (1 Okt 2026).
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
 - [x] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push (29 Sep 2026). Header `nosniff` aktif di produksi.
