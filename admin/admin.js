@@ -2088,11 +2088,11 @@ function adminRowHtml(account) {
     <div class="admin-row">
       <span class="admin-who">
         <span class="row"><strong>${esc(account.email ?? "(tanpa email)")}</strong>${
-          account.self ? `<span class="tag">Anda</span>` : ""
-        }</span>
+          account.owner ? `<span class="tag">Pemilik</span>` : ""
+        }${account.self ? `<span class="tag">Anda</span>` : ""}</span>
         <span class="small muted">${esc(seen)}</span>
       </span>
-      ${account.self ? "" : `<button class="btn ghost" type="button" data-remove="${esc(account.id)}">Cabut akses</button>`}
+      ${account.owner ? "" : `<button class="btn ghost" type="button" data-remove="${esc(account.id)}">Cabut akses</button>`}
     </div>`;
 }
 
@@ -2176,16 +2176,54 @@ function bindAdminAccounts(seq) {
 async function renderAccount() {
   const seq = ++renderSeq;
   app.innerHTML = `<p class="page muted">Memuat…</p>`;
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const [
+    {
+      data: { session },
+    },
+    { data: owner, error: ownerError },
+  ] = await Promise.all([supabase.auth.getSession(), supabase.rpc("is_owner")]);
   if (seq !== renderSeq) return;
   const email = session?.user?.email ?? "";
+
+  const manage = owner
+    ? `
+      <div class="card stack">
+        <h2>Akun admin</h2>
+        <p class="small muted">Akun yang Anda tambahkan menjadi staf: bisa mengurus pesanan, menu, dan tagihan, tapi tidak bisa menambah atau mencabut akun.</p>
+        <div class="admin-list" data-admins><p class="small muted">Memuat…</p></div>
+        <p class="error" data-admins-error hidden></p>
+      </div>
+      <form id="add-admin-form" class="card stack" novalidate>
+        <h2>Tambah akun staf</h2>
+        <label class="field">
+          <span>Email</span>
+          <input class="input" type="email" name="email" autocomplete="off" required />
+        </label>
+        <div class="field">
+          <label class="label" for="new-admin-password">Sandi sementara</label>
+          <div class="row">
+            <input class="input" id="new-admin-password" type="text" name="password" autocomplete="off" spellcheck="false" required />
+            <button class="btn" type="button" data-generate>Buat acak</button>
+          </div>
+          <span class="small muted">Berikan email dan sandi ini ke orangnya, lalu minta dia menggantinya di halaman Akun.</span>
+        </div>
+        <p class="error" data-error hidden></p>
+        <button class="btn primary full" type="submit">Tambah akun</button>
+      </form>`
+    : ownerError
+      ? `<p class="error">Peran akun belum bisa diperiksa. ${esc(
+          ownerError.code === "PGRST202"
+            ? "Migration pemilik admin belum dijalankan di Supabase."
+            : errorMessage(ownerError)
+        )}</p>`
+      : "";
 
   app.innerHTML = `
     <section class="page">
       <h1>Akun</h1>
-      <p class="small muted">Masuk sebagai <strong>${esc(email)}</strong></p>
+      <p class="small muted">Masuk sebagai <strong>${esc(email)}</strong>${
+        owner ? " (pemilik)" : ownerError ? "" : " (staf)"
+      }</p>
       <form id="password-form" class="card stack" novalidate>
         <h2>Ganti sandi</h2>
         <input type="email" name="username" autocomplete="username" value="${esc(email)}" hidden readonly />
@@ -2206,32 +2244,10 @@ async function renderAccount() {
         <p class="error" data-error hidden></p>
         <button class="btn primary full" type="submit">Ganti sandi</button>
       </form>
-      <div class="card stack">
-        <h2>Akun admin</h2>
-        <p class="small muted">Semua akun admin punya akses yang sama, termasuk menambah dan mencabut akun.</p>
-        <div class="admin-list" data-admins><p class="small muted">Memuat…</p></div>
-        <p class="error" data-admins-error hidden></p>
-      </div>
-      <form id="add-admin-form" class="card stack" novalidate>
-        <h2>Tambah akun</h2>
-        <label class="field">
-          <span>Email</span>
-          <input class="input" type="email" name="email" autocomplete="off" required />
-        </label>
-        <div class="field">
-          <label class="label" for="new-admin-password">Sandi sementara</label>
-          <div class="row">
-            <input class="input" id="new-admin-password" type="text" name="password" autocomplete="off" spellcheck="false" required />
-            <button class="btn" type="button" data-generate>Buat acak</button>
-          </div>
-          <span class="small muted">Berikan email dan sandi ini ke orangnya, lalu minta dia menggantinya di halaman Akun.</span>
-        </div>
-        <p class="error" data-error hidden></p>
-        <button class="btn primary full" type="submit">Tambah akun</button>
-      </form>
+      ${manage}
     </section>`;
 
-  bindAdminAccounts(seq);
+  if (owner) bindAdminAccounts(seq);
 
   const form = app.querySelector("#password-form");
   const fields = form.elements;

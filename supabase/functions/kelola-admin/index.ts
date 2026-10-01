@@ -1,6 +1,7 @@
 // Kelola akun admin dari dashboard: daftar, tambah, dan cabut akses.
 // Membuat dan menghapus akun butuh kunci rahasia, jadi dikerjakan di sini,
-// bukan di browser. Pemanggil harus admin yang sedang masuk.
+// bukan di browser. Pemanggil harus pemilik (admins.is_owner) yang sedang
+// masuk; akun yang dibuat di sini selalu menjadi staf.
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 
 const ORIGINS = ["https://www.tetuti.my.id", "https://tetuti.my.id"];
@@ -36,7 +37,11 @@ function corsHeaders(origin: string | null) {
 }
 
 async function listAdmins(me: string) {
-  const { data: rows, error } = await admin.from("admins").select("user_id, created_at").order("created_at");
+  const { data: rows, error } = await admin
+    .from("admins")
+    .select("user_id, is_owner, created_at")
+    .order("is_owner", { ascending: false })
+    .order("created_at");
   if (error) throw error;
   const list = [];
   for (const row of rows) {
@@ -44,6 +49,7 @@ async function listAdmins(me: string) {
     list.push({
       id: row.user_id,
       email: data.user?.email ?? null,
+      owner: row.is_owner,
       created_at: row.created_at,
       last_sign_in_at: data.user?.last_sign_in_at ?? null,
       self: row.user_id === me,
@@ -69,11 +75,12 @@ Deno.serve(async (req) => {
     const me = caller.user.id;
     const { data: mine, error: mineError } = await admin
       .from("admins")
-      .select("user_id")
+      .select("is_owner")
       .eq("user_id", me)
       .maybeSingle();
     if (mineError) throw mineError;
     if (!mine) return fail("Akun ini tidak punya akses admin.", 403);
+    if (!mine.is_owner) return fail("Hanya pemilik yang bisa mengelola akun admin.", 403);
 
     let body: Record<string, unknown>;
     try {
@@ -116,14 +123,14 @@ Deno.serve(async (req) => {
     if (body.action === "remove") {
       const id = String(body.user_id ?? "");
       if (!UUID.test(id)) return fail("Akun tidak dikenali.");
-      if (id === me) return fail("Akses akun sendiri tidak bisa dicabut. Minta admin lain melakukannya.");
       const { data: target, error: targetError } = await admin
         .from("admins")
-        .select("user_id")
+        .select("is_owner")
         .eq("user_id", id)
         .maybeSingle();
       if (targetError) throw targetError;
       if (!target) return fail("Akun ini sudah bukan admin.", 404);
+      if (target.is_owner) return fail("Akses akun pemilik tidak bisa dicabut.");
       // Menghapus akun ikut menghapus barisnya di admins dan semua sesinya.
       const { error: deleteError } = await admin.auth.admin.deleteUser(id);
       if (deleteError) throw deleteError;

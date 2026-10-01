@@ -186,10 +186,11 @@ Di admin:
 
 ### Akun admin
 
-- Halaman Akun juga berisi daftar akun admin (email, terakhir masuk), tambah akun, dan cabut akses. Semua admin punya hak yang sama, termasuk menambah dan mencabut akun. (Keputusan pemilik, 1 Okt 2026.)
-- Tambah akun: email dan sandi sementara (bisa dibuat acak). Sandi sementara tampil sekali setelah akun dibuat; admin mengirimnya ke orangnya, lalu orang itu mengganti sandi di halaman Akun. Tidak lewat undangan email, karena email bawaan Supabase hanya terkirim ke anggota tim proyek.
-- Cabut akses menghapus akunnya (baris `admins` dan sesinya ikut terhapus). Akses akun sendiri tidak bisa dicabut, jadi selalu tersisa minimal satu admin.
-- Membuat dan menghapus akun butuh kunci rahasia, jadi dikerjakan Edge Function `kelola-admin` (`supabase/functions/kelola-admin/index.ts`). Fungsi itu memeriksa token pemanggil dan tabel `admins` sebelum bertindak, dan hanya menerima panggilan dari `www.tetuti.my.id` dan `tetuti.my.id`.
+- Ada satu **pemilik** (`admins.is_owner`, dijaga unique index) dan sisanya **staf**. Staf punya akses pesanan, menu, dan tagihan yang sama, dan bisa mengganti sandinya sendiri. Hanya pemilik yang melihat daftar akun, menambah akun, dan mencabut akses; bagian itu tidak tampil untuk staf. (Keputusan pemilik, 1 Okt 2026, menggantikan keputusan "semua admin setara".)
+- Migrasi `20261001000000_pemilik_admin.sql` menjadikan admin yang paling dulu terdaftar sebagai pemilik. Mengganti pemilik dilakukan lewat SQL Editor.
+- Tambah akun: email dan sandi sementara (bisa dibuat acak). Akun baru selalu staf. Sandi sementara tampil sekali setelah akun dibuat; pemilik mengirimnya ke orangnya, lalu orang itu mengganti sandi di halaman Akun. Tidak lewat undangan email, karena email bawaan Supabase hanya terkirim ke anggota tim proyek.
+- Cabut akses menghapus akun staf (baris `admins` dan sesinya ikut terhapus). Akses pemilik tidak bisa dicabut. Kalau pemilik lupa sandi, pemulihannya lewat dashboard Supabase.
+- Membuat dan menghapus akun butuh kunci rahasia, jadi dikerjakan Edge Function `kelola-admin` (`supabase/functions/kelola-admin/index.ts`). Fungsi itu memeriksa token pemanggil dan bahwa pemanggilnya pemilik sebelum bertindak, dan hanya menerima panggilan dari `www.tetuti.my.id` dan `tetuti.my.id`.
 
 ### Menu navigasi
 
@@ -305,7 +306,8 @@ Fase 3, langkah 1 — ganti sandi:
 - [x] Agen: halaman Akun dengan ganti sandi; perangkat lain dikeluarkan (tanpa migrasi).
 - [ ] Pemilik: push, ganti sandi di laptop, lalu buka admin di HP; HP harus kembali ke layar masuk.
 - [x] Agen: menu ☰, daftar akun admin, tambah akun, cabut akses (Edge Function `kelola-admin`, tanpa migrasi).
-- [ ] Pemilik: pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah dan cabut akun uji.
+- [x] Agen: peran pemilik dan staf (migrasi `20261001000000_pemilik_admin.sql`, Edge Function `kelola-admin` hanya untuk pemilik).
+- [ ] Pemilik: jalankan migrasi pemilik admin, pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah, masuk sebagai staf, dan cabut akun uji.
 
 Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
