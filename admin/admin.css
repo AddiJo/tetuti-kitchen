@@ -63,6 +63,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 16px;
   background: var(--brand);
   color: #fff;
@@ -72,6 +73,13 @@ p {
   color: #fff;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .brand-extra {
+    display: none;
+  }
 }
 
 .topnav {

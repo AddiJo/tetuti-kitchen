@@ -211,6 +211,43 @@ export function errorMessage(error) {
   return `Gagal: ${message}`;
 }
 
+export const PASSWORD_MIN = 8;
+// Supabase Auth menolak sandi lebih dari 72 karakter.
+export const PASSWORD_MAX = 72;
+
+export function passwordChangeProblem({ current, next, repeat }) {
+  if (!current || !next || !repeat) return "Isi sandi lama, sandi baru, dan ulangi sandi baru.";
+  if (next.length < PASSWORD_MIN) return `Sandi baru minimal ${PASSWORD_MIN} karakter.`;
+  if (next.length > PASSWORD_MAX) return `Sandi baru maksimal ${PASSWORD_MAX} karakter.`;
+  if (next !== repeat) return "Ulangi sandi baru belum sama dengan sandi baru.";
+  if (next === current) return "Sandi baru harus berbeda dari sandi lama.";
+  return null;
+}
+
+export function currentPasswordErrorMessage(error) {
+  if (error.status === 429) return "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.";
+  if (error.status === 400 || /invalid login credentials/i.test(error.message || "")) {
+    return "Sandi lama salah.";
+  }
+  return errorMessage(error);
+}
+
+export function passwordErrorMessage(error) {
+  if (error.status === 429) return "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.";
+  if (error.code === "same_password") return "Sandi baru harus berbeda dari sandi lama.";
+  if (error.code === "invalid_credentials") return "Sandi lama salah.";
+  if (error.code === "weak_password") {
+    if (error.reasons?.includes("pwned")) {
+      return "Sandi ini pernah bocor di internet, jadi ditolak. Pakai sandi lain.";
+    }
+    return "Sandi baru terlalu lemah. Pakai gabungan huruf besar, huruf kecil, angka, dan simbol.";
+  }
+  if (error.code === "reauthentication_needed" || error.code === "reauth_nonce_missing") {
+    return "Supabase meminta Anda masuk ulang dulu. Keluar, masuk lagi, lalu ganti sandi.";
+  }
+  return errorMessage(error);
+}
+
 export function loginErrorMessage(error) {
   if (error.status === 429) {
     return "Terlalu banyak percobaan masuk. Tunggu beberapa menit lalu coba lagi.";

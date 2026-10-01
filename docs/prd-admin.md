@@ -180,15 +180,16 @@ Di admin:
 
 ### Atur ulang sandi
 
-- Hanya saat sudah masuk. Sandi lama, sandi baru, ulang sandi baru. Minimal 8 karakter.
-- Setelah ganti sandi, sesi di perangkat lain habis.
+- Hanya saat sudah masuk, di halaman Akun (`#/akun`). Sandi lama, sandi baru, ulang sandi baru. Minimal 8 karakter, maksimal 72 (batas Supabase Auth).
+- Sandi lama diperiksa dengan masuk ulang. Ini juga memberi sesi baru, karena Supabase bisa meminta sesi yang belum lama dibuat untuk ganti sandi. Sandi lama ikut dikirim sebagai `current_password` kalau pengaturan Supabase memintanya.
+- Setelah ganti sandi, sesi di perangkat lain diakhiri (`signOut({ scope: "others" })`). Perangkat itu kembali ke layar masuk saat admin dibuka atau tabnya dibuka lagi. Kalau tab terus terbuka tanpa disentuh, paling lama satu jam (sampai tokennya habis).
 
 ### Laporan penjualan
 
-Pesanan batal tidak dihitung. Omzet dari tagihan lunas. Hari ini mengikuti zona waktu Jakarta.
+Pesanan batal tidak dihitung. Omzet dari tagihan lunas, dihitung di tanggal bayar (waktu lunas), bukan tanggal pesanan. Hari ini mengikuti zona waktu Jakarta. (Keputusan pemilik, 1 Okt 2026.)
 
 - Ringkasan hari ini: jumlah pesanan, belum selesai, omzet lunas, nominal belum dibayar.
-- Rekap per periode: tabel harian jumlah pesanan dan omzet.
+- Rekap per periode: tabel harian 30 hari terakhir, berisi jumlah pesanan dan omzet.
 - Menu terlaris: peringkat menurut jumlah porsi, termasuk menu yang disembunyikan.
 - Belum lunas: tagihan terkirim yang belum lunas, yang paling lama di atas.
 - Sumber pesanan: berapa dari situs, berapa dicatat manual.
@@ -287,5 +288,12 @@ Fase 2, langkah 2 — tagihan:
 - [x] Pemilik: jalankan migrasi invoice PDF, push, dan uji kirim tautan PDF ke WhatsApp (29 Sep 2026). Rewrite `/i/…` di produksi meneruskan ke Supabase Storage dengan `noindex`.
 - [x] Pemilik: tandai lunas tagihan uji, lalu buka tautan yang sama; capnya harus Lunas (29 Sep 2026).
 - [x] Agen: kartu tagihan dirapikan (tombol utama, sisanya di Lainnya) dan rekening BRI jadi instruksi bawaan. Diuji pemilik (1 Okt 2026).
+
+Fase 3, langkah 1 — ganti sandi:
+
+- [x] Agen: halaman Akun dengan ganti sandi; perangkat lain dikeluarkan (tanpa migrasi).
+- [ ] Pemilik: push, ganti sandi di laptop, lalu buka admin di HP; HP harus kembali ke layar masuk.
+
+Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
 - [x] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push (29 Sep 2026). Header `nosniff` aktif di produksi.

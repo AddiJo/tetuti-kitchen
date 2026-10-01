@@ -1,6 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config.js";
 import {
+  currentPasswordErrorMessage,
   displayPhone,
   errorMessage,
   esc,
@@ -20,6 +21,10 @@ import {
   METHOD_LABEL,
   normalizePhone,
   parseRupiah,
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  passwordChangeProblem,
+  passwordErrorMessage,
   priceLabel,
   toJakartaInput,
   uniqueSlug,
@@ -35,6 +40,7 @@ const IDLE_LIMIT_MS = 12 * 60 * 60 * 1000;
 const LAST_ACTIVE_KEY = "tetuti-admin-last-active";
 const SOUND_KEY = "tetuti-admin-sound";
 const IDLE_MESSAGE = "Sesi habis karena 12 jam tidak dipakai. Silakan masuk lagi.";
+const REVOKED_MESSAGE = "Sesi di perangkat ini sudah diakhiri, misalnya karena sandi diganti. Silakan masuk lagi.";
 
 const FLOW = ["baru", "dikonfirmasi", "diproses", "selesai"];
 const STATUS_LABEL = {
@@ -2037,6 +2043,103 @@ async function renderMenuForm(id) {
   });
 }
 
+// Akun -----------------------------------------------------------------------
+
+// Token yang tersimpan tetap terlihat sah setelah sesinya diakhiri dari
+// perangkat lain; baru ketahuan saat dicek ke server Auth.
+async function sessionRevoked() {
+  const { error } = await supabase.auth.getUser();
+  return error?.name === "AuthSessionMissingError";
+}
+
+async function checkRevoked() {
+  if (state.signedIn && (await sessionRevoked()) && state.signedIn) signOut(REVOKED_MESSAGE);
+}
+
+async function renderAccount() {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (seq !== renderSeq) return;
+  const email = session?.user?.email ?? "";
+
+  app.innerHTML = `
+    <section class="page">
+      <h1>Akun</h1>
+      <p class="small muted">Masuk sebagai <strong>${esc(email)}</strong></p>
+      <form id="password-form" class="card stack" novalidate>
+        <h2>Ganti sandi</h2>
+        <input type="email" name="username" autocomplete="username" value="${esc(email)}" hidden readonly />
+        <label class="field">
+          <span>Sandi lama</span>
+          <input class="input" type="password" name="current" autocomplete="current-password" required />
+        </label>
+        <label class="field">
+          <span>Sandi baru</span>
+          <input class="input" type="password" name="next" autocomplete="new-password" required />
+          <span class="small muted">Minimal ${PASSWORD_MIN} karakter, maksimal ${PASSWORD_MAX}.</span>
+        </label>
+        <label class="field">
+          <span>Ulangi sandi baru</span>
+          <input class="input" type="password" name="repeat" autocomplete="new-password" required />
+        </label>
+        <p class="small muted">Setelah sandi diganti, perangkat lain yang masih masuk akan dikeluarkan.</p>
+        <p class="error" data-error hidden></p>
+        <button class="btn primary full" type="submit">Ganti sandi</button>
+      </form>
+    </section>`;
+
+  const form = app.querySelector("#password-form");
+  const fields = form.elements;
+  const errorEl = form.querySelector("[data-error]");
+  const button = form.querySelector('button[type="submit"]');
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+    const values = { current: fields.current.value, next: fields.next.value, repeat: fields.repeat.value };
+    const problem = passwordChangeProblem(values);
+    if (problem) return showError(errorEl, problem);
+
+    button.disabled = true;
+    button.textContent = "Mengganti sandi…";
+    const done = () => {
+      button.disabled = false;
+      button.textContent = "Ganti sandi";
+    };
+
+    // Masuk ulang memastikan sandi lama benar dan memberi sesi baru, karena
+    // Supabase bisa meminta sesi yang belum lama dibuat untuk ganti sandi.
+    const { error: checkError } = await supabase.auth.signInWithPassword({ email, password: values.current });
+    if (checkError) {
+      done();
+      return showError(errorEl, currentPasswordErrorMessage(checkError));
+    }
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: values.next,
+      current_password: values.current,
+    });
+    if (updateError) {
+      done();
+      return showError(errorEl, passwordErrorMessage(updateError));
+    }
+    markActive();
+
+    const { error: othersError } = await supabase.auth.signOut({ scope: "others" });
+    form.reset();
+    done();
+    if (othersError) {
+      return showError(
+        errorEl,
+        "Sandi sudah diganti, tapi perangkat lain gagal dikeluarkan. Tekan Keluar di perangkat itu."
+      );
+    }
+    toast("Sandi diganti. Perangkat lain sudah dikeluarkan.");
+  });
+}
+
 // Rute -----------------------------------------------------------------------
 
 function route() {
@@ -2046,13 +2149,15 @@ function route() {
   let match;
   state.printTitle = null;
 
-  const section = path === "/menu" || path.startsWith("/menu/") ? "menu" : "pesanan";
+  const section =
+    path === "/akun" ? "akun" : path === "/menu" || path.startsWith("/menu/") ? "menu" : "pesanan";
   topbar.querySelectorAll("[data-nav]").forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
 
   if (path === "/") return renderList();
+  if (path === "/akun") return renderAccount();
   if (path === "/menu") return renderMenu();
   if (path === "/menu/baru") return renderMenuForm(null);
   if ((match = path.match(/^\/menu\/([a-z0-9-]+)$/))) return renderMenuForm(match[1]);
@@ -2102,6 +2207,7 @@ syncBell();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
   checkIdle();
+  checkRevoked();
   checkNewOrders();
 });
 setInterval(checkIdle, 60_000);
@@ -2119,6 +2225,7 @@ async function boot() {
   } = await supabase.auth.getSession();
   if (!session) return renderLogin();
   if (idleExpired()) return signOut(IDLE_MESSAGE);
+  if (await sessionRevoked()) return signOut(REVOKED_MESSAGE);
 
   const access = await confirmAdmin();
   if (access !== true) return renderLogin(access);
