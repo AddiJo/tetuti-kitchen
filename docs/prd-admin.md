@@ -307,7 +307,7 @@ Fase 3, langkah 1 — ganti sandi:
 - [ ] Pemilik: push, ganti sandi di laptop, lalu buka admin di HP; HP harus kembali ke layar masuk.
 - [x] Agen: menu ☰, daftar akun admin, tambah akun, cabut akses (Edge Function `kelola-admin`, tanpa migrasi).
 - [x] Agen: peran pemilik dan staf (migrasi `20261001000000_pemilik_admin.sql`, Edge Function `kelola-admin` hanya untuk pemilik).
-- [ ] Pemilik: jalankan migrasi pemilik admin, pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah, masuk sebagai staf, dan cabut akun uji.
+- [x] Pemilik: jalankan migrasi pemilik admin, pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah, masuk sebagai staf, dan cabut akun uji.
 
 Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
