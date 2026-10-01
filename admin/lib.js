@@ -22,6 +22,14 @@ const longDay = new Intl.DateTimeFormat("id-ID", {
   year: "numeric",
 });
 
+// Tanggal laporan sudah berupa hari Jakarta (YYYY-MM-DD), jadi dibaca sebagai UTC.
+const reportDay = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "UTC",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
 export function esc(value) {
@@ -44,6 +52,10 @@ export function formatDate(iso) {
 
 export function formatDay(iso) {
   return iso ? longDay.format(new Date(iso)) : "";
+}
+
+export function formatReportDay(day) {
+  return day ? reportDay.format(new Date(`${day}T00:00:00Z`)) : "";
 }
 
 // Menerima 0812…, 812…, +62 812…, atau 62812…; hasilnya selalu 62… tanpa spasi.

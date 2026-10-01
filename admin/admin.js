@@ -7,6 +7,7 @@ import {
   esc,
   formatDate,
   formatDay,
+  formatReportDay,
   formatRp,
   fromJakartaInput,
   invoiceCaption,
@@ -2298,6 +2299,131 @@ async function renderAccount() {
   });
 }
 
+// Laporan --------------------------------------------------------------------
+
+function statHtml(label, value, hint = "") {
+  return `
+    <div class="stat">
+      <span class="small muted">${esc(label)}</span>
+      <strong>${esc(value)}</strong>
+      ${hint ? `<span class="small muted">${esc(hint)}</span>` : ""}
+    </div>`;
+}
+
+function reportMenuHtml(menu) {
+  if (!menu.length) return `<p class="small muted">Belum ada pesanan dalam 30 hari terakhir.</p>`;
+  const top = menu[0].portions;
+  const rows = menu
+    .map(
+      (item) => `
+        <div class="rank">
+          <div class="row between">
+            <strong>${esc(item.name)}</strong>
+            <span class="small">${item.portions} porsi · ${item.orders} pesanan</span>
+          </div>
+          <span class="bar"><span style="width: ${Math.max(2, Math.round((item.portions / top) * 100))}%"></span></span>
+        </div>`
+    )
+    .join("");
+  return `<div class="ranks">${rows}</div>`;
+}
+
+function reportUnpaidHtml(unpaid) {
+  if (!unpaid.length) return `<p class="small muted">Tidak ada tagihan terkirim yang belum lunas.</p>`;
+  return unpaid
+    .map(
+      (invoice) => `
+        <a class="admin-row unpaid-row" href="#/pesanan/${esc(invoice.order_id)}">
+          <span class="admin-who">
+            <strong>${esc(invoice.customer_name)}</strong>
+            <span class="small muted">${esc(invoice.code)} · dikirim ${esc(formatDate(invoice.sent_at))}</span>
+          </span>
+          <strong>${esc(formatRp(invoice.total))}</strong>
+        </a>`
+    )
+    .join("");
+}
+
+function reportDaysHtml(days) {
+  return days
+    .map(
+      (day) => `
+        <tr${day.orders || day.revenue ? "" : ` class="quiet"`}>
+          <td>${esc(formatReportDay(day.day))}</td>
+          <td class="num">${day.orders}</td>
+          <td class="num">${esc(formatRp(day.revenue))}</td>
+        </tr>`
+    )
+    .join("");
+}
+
+async function renderReport() {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const { data: report, error } = await supabase.rpc("sales_report");
+  if (seq !== renderSeq) return;
+  if (error) {
+    return renderProblem(
+      error.code === "PGRST202"
+        ? "Migration laporan belum dijalankan di Supabase."
+        : `Laporan gagal dimuat. ${errorMessage(error)}`
+    );
+  }
+
+  const periodOrders = report.days.reduce((sum, day) => sum + day.orders, 0);
+  const periodRevenue = report.days.reduce((sum, day) => sum + day.revenue, 0);
+  const sourceTotal = report.sources.situs + report.sources.admin;
+  const share = (count) => (sourceTotal ? ` (${Math.round((count / sourceTotal) * 100)}%)` : "");
+
+  app.innerHTML = `
+    <section class="page">
+      <h1>Laporan</h1>
+      <p class="small muted">
+        Pesanan batal tidak dihitung. Omzet adalah nominal yang diterima dari tagihan lunas, dihitung di tanggal lunasnya.
+      </p>
+
+      <div class="card stack">
+        <h2>Hari ini <span class="small muted">${esc(formatDay(report.today))}</span></h2>
+        <div class="stats">
+          ${statHtml("Pesanan masuk", String(report.orders_today))}
+          ${statHtml("Belum selesai", String(report.open_orders), "Baru, Dikonfirmasi, Diproses")}
+          ${statHtml("Omzet lunas", formatRp(report.paid_today))}
+          ${statHtml("Belum dibayar", formatRp(report.unpaid_total), "Semua tagihan terkirim")}
+        </div>
+      </div>
+
+      <div class="card stack">
+        <h2>30 hari terakhir <span class="small muted">${esc(formatReportDay(report.first_day))} – ${esc(
+          formatReportDay(report.today)
+        )}</span></h2>
+        <div class="stats">
+          ${statHtml("Pesanan", String(periodOrders))}
+          ${statHtml("Omzet", formatRp(periodRevenue))}
+          ${statHtml("Dari situs", `${report.sources.situs}${share(report.sources.situs)}`)}
+          ${statHtml("Dicatat admin", `${report.sources.admin}${share(report.sources.admin)}`)}
+        </div>
+      </div>
+
+      <div class="card stack">
+        <h2>Menu terlaris <span class="small muted">30 hari terakhir</span></h2>
+        ${reportMenuHtml(report.menu)}
+      </div>
+
+      <div class="card stack">
+        <h2>Belum lunas <span class="small muted">paling lama di atas</span></h2>
+        <div class="admin-list">${reportUnpaidHtml(report.unpaid)}</div>
+      </div>
+
+      <div class="card stack">
+        <h2>Rekap harian</h2>
+        <table class="report-days">
+          <thead><tr><th>Tanggal</th><th class="num">Pesanan</th><th class="num">Omzet</th></tr></thead>
+          <tbody>${reportDaysHtml(report.days)}</tbody>
+        </table>
+      </div>
+    </section>`;
+}
+
 // Rute -----------------------------------------------------------------------
 
 function route() {
@@ -2308,7 +2434,13 @@ function route() {
   state.printTitle = null;
 
   const section =
-    path === "/akun" ? "akun" : path === "/menu" || path.startsWith("/menu/") ? "menu" : "pesanan";
+    path === "/akun"
+      ? "akun"
+      : path === "/laporan"
+        ? "laporan"
+        : path === "/menu" || path.startsWith("/menu/")
+          ? "menu"
+          : "pesanan";
   topbar.querySelectorAll("[data-nav]").forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -2316,6 +2448,7 @@ function route() {
 
   if (path === "/") return renderList();
   if (path === "/akun") return renderAccount();
+  if (path === "/laporan") return renderReport();
   if (path === "/menu") return renderMenu();
   if (path === "/menu/baru") return renderMenuForm(null);
   if ((match = path.match(/^\/menu\/([a-z0-9-]+)$/))) return renderMenuForm(match[1]);

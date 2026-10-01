@@ -194,17 +194,18 @@ Di admin:
 
 ### Menu navigasi
 
-- Tombol ☰ di kanan atas, di semua ukuran layar, membuka daftar Pesanan, Menu, Akun, dan Keluar. Lonceng bunyi tetap di luar menu. Menu tertutup saat item dipilih, saat mengetuk di luar menu, atau dengan tombol Esc. (Permintaan pemilik, 1 Okt 2026.)
+- Tombol ☰ di kanan atas, di semua ukuran layar, membuka daftar Pesanan, Menu, Laporan, Akun, dan Keluar. Lonceng bunyi tetap di luar menu. Menu tertutup saat item dipilih, saat mengetuk di luar menu, atau dengan tombol Esc. (Permintaan pemilik, 1 Okt 2026.)
 
 ### Laporan penjualan
 
 Pesanan batal tidak dihitung. Omzet dari tagihan lunas, dihitung di tanggal bayar (waktu lunas), bukan tanggal pesanan. Hari ini mengikuti zona waktu Jakarta. (Keputusan pemilik, 1 Okt 2026.)
 
-- Ringkasan hari ini: jumlah pesanan, belum selesai, omzet lunas, nominal belum dibayar.
-- Rekap per periode: tabel harian 30 hari terakhir, berisi jumlah pesanan dan omzet.
-- Menu terlaris: peringkat menurut jumlah porsi, termasuk menu yang disembunyikan.
-- Belum lunas: tagihan terkirim yang belum lunas, yang paling lama di atas.
-- Sumber pesanan: berapa dari situs, berapa dicatat manual.
+- Halaman Laporan (`#/laporan`, di menu ☰) untuk semua admin. Angka dihitung fungsi database `sales_report()` (security invoker, jadi hanya admin yang mendapat angka).
+- Ringkasan hari ini: pesanan masuk hari ini, belum selesai (semua pesanan Baru, Dikonfirmasi, Diproses), omzet lunas hari ini, dan nominal belum dibayar (semua tagihan Terkirim).
+- 30 hari terakhir: total pesanan, total omzet, dan sumber pesanan (situs atau dicatat admin, dengan persentase).
+- Rekap harian: tabel 30 hari, terbaru di atas, berisi jumlah pesanan (menurut tanggal pesanan dibuat) dan omzet (menurut tanggal lunas). Hari tanpa pesanan dan omzet tampil pudar.
+- Menu terlaris: peringkat menurut jumlah porsi dari pesanan 30 hari terakhir, termasuk menu yang disembunyikan. Nama mengikuti nama menu sekarang; item tanpa menu (dihapus atau diketik bebas) dikelompokkan menurut namanya.
+- Belum lunas: tagihan Terkirim, yang paling lama dikirim di atas, menautkan ke pesanannya.
 
 ## Fase 4 — Pengaturan toko
 
@@ -278,7 +279,7 @@ Langkah 2 — pesanan situs otomatis:
 
 Langkah 3 — bunyi pesanan baru:
 
-- [ ] Pemilik: jalankan migrasi Realtime untuk tabel `orders`.
+- [x] Pemilik: jalankan migrasi Realtime untuk tabel `orders`. (Diperiksa 1 Okt 2026.)
 - [x] Agen: daftar memperbarui sendiri, bunyi, angka di judul tab, tanda “Baru masuk”.
 - [ ] Uji dengan dua perangkat: pesan dari HP, dengar bunyi di admin.
 
@@ -288,7 +289,7 @@ Fase 2, langkah 1 — kelola menu:
 - [x] Pemilik: jalankan migrasi `20260929020000_kelola_menu.sql` sebelum push.
 - [x] Pemilik: push, lalu uji ganti foto dan tambah menu. Tampil di situs (29 Sep 2026).
 - [x] Agen: hapus menu yang belum pernah dipesan (migrasi `20260929030000_hapus_menu.sql`).
-- [ ] Pemilik: jalankan migrasi hapus menu, push, lalu hapus menu uji.
+- [x] Pemilik: jalankan migrasi hapus menu, push, lalu hapus menu uji. (Diperiksa 1 Okt 2026: tersisa empat menu asli.)
 
 Fase 2, langkah 2 — tagihan:
 
@@ -309,6 +310,10 @@ Fase 3, langkah 1 — ganti sandi:
 - [x] Agen: peran pemilik dan staf (migrasi `20261001000000_pemilik_admin.sql`, Edge Function `kelola-admin` hanya untuk pemilik).
 - [x] Pemilik: jalankan migrasi pemilik admin, pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah, masuk sebagai staf, dan cabut akun uji.
 
-Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).
 - [x] Pemilik: jalankan migrasi `20260929060000_hapus_pdf_lama.sql`, lalu push (29 Sep 2026). Header `nosniff` aktif di produksi.
+
+Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
+
+- [x] Agen: halaman Laporan dan fungsi `sales_report()` (migrasi `20261001010000_laporan.sql`).
+- [ ] Pemilik: jalankan migrasi laporan, push, lalu cocokkan angka Laporan dengan pesanan dan tagihan yang ada.
