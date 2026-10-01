@@ -184,6 +184,17 @@ Di admin:
 - Sandi lama diperiksa dengan masuk ulang. Ini juga memberi sesi baru, karena Supabase bisa meminta sesi yang belum lama dibuat untuk ganti sandi. Sandi lama ikut dikirim sebagai `current_password` kalau pengaturan Supabase memintanya.
 - Setelah ganti sandi, sesi di perangkat lain diakhiri (`signOut({ scope: "others" })`). Perangkat itu kembali ke layar masuk saat admin dibuka atau tabnya dibuka lagi. Kalau tab terus terbuka tanpa disentuh, paling lama satu jam (sampai tokennya habis).
 
+### Akun admin
+
+- Halaman Akun juga berisi daftar akun admin (email, terakhir masuk), tambah akun, dan cabut akses. Semua admin punya hak yang sama, termasuk menambah dan mencabut akun. (Keputusan pemilik, 1 Okt 2026.)
+- Tambah akun: email dan sandi sementara (bisa dibuat acak). Sandi sementara tampil sekali setelah akun dibuat; admin mengirimnya ke orangnya, lalu orang itu mengganti sandi di halaman Akun. Tidak lewat undangan email, karena email bawaan Supabase hanya terkirim ke anggota tim proyek.
+- Cabut akses menghapus akunnya (baris `admins` dan sesinya ikut terhapus). Akses akun sendiri tidak bisa dicabut, jadi selalu tersisa minimal satu admin.
+- Membuat dan menghapus akun butuh kunci rahasia, jadi dikerjakan Edge Function `kelola-admin` (`supabase/functions/kelola-admin/index.ts`). Fungsi itu memeriksa token pemanggil dan tabel `admins` sebelum bertindak, dan hanya menerima panggilan dari `www.tetuti.my.id` dan `tetuti.my.id`.
+
+### Menu navigasi
+
+- Tombol ☰ di kanan atas, di semua ukuran layar, membuka daftar Pesanan, Menu, Akun, dan Keluar. Lonceng bunyi tetap di luar menu. Menu tertutup saat item dipilih, saat mengetuk di luar menu, atau dengan tombol Esc. (Permintaan pemilik, 1 Okt 2026.)
+
 ### Laporan penjualan
 
 Pesanan batal tidak dihitung. Omzet dari tagihan lunas, dihitung di tanggal bayar (waktu lunas), bukan tanggal pesanan. Hari ini mengikuti zona waktu Jakarta. (Keputusan pemilik, 1 Okt 2026.)
@@ -293,6 +304,8 @@ Fase 3, langkah 1 — ganti sandi:
 
 - [x] Agen: halaman Akun dengan ganti sandi; perangkat lain dikeluarkan (tanpa migrasi).
 - [ ] Pemilik: push, ganti sandi di laptop, lalu buka admin di HP; HP harus kembali ke layar masuk.
+- [x] Agen: menu ☰, daftar akun admin, tambah akun, cabut akses (Edge Function `kelola-admin`, tanpa migrasi).
+- [ ] Pemilik: pasang Edge Function `kelola-admin` lewat dashboard Supabase, push, lalu uji tambah dan cabut akun uji.
 
 Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 - [x] Agen: hapus PDF 30 hari setelah pesanan Selesai atau Batal, dan header `nosniff` (migrasi `20260929060000_hapus_pdf_lama.sql`).

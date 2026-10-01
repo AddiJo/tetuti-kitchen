@@ -224,6 +224,23 @@ export function passwordChangeProblem({ current, next, repeat }) {
   return null;
 }
 
+// Tanpa huruf yang mudah tertukar (I, l, O, 0, 1) karena sandi sementara
+// dibacakan atau diketik ulang dari chat.
+const PASSWORD_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+// Byte di atas batas ini dibuang supaya setiap huruf punya peluang yang sama.
+const PASSWORD_BYTE_LIMIT = 256 - (256 % PASSWORD_CHARS.length);
+
+export function randomPassword(fill = (bytes) => crypto.getRandomValues(bytes)) {
+  for (;;) {
+    const bytes = fill(new Uint8Array(12));
+    if (bytes.some((byte) => byte >= PASSWORD_BYTE_LIMIT)) continue;
+    const chars = Array.from(bytes, (byte) => PASSWORD_CHARS[byte % PASSWORD_CHARS.length]).join("");
+    if (/[A-Z]/.test(chars) && /[a-z]/.test(chars) && /[0-9]/.test(chars)) {
+      return `${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8)}`;
+    }
+  }
+}
+
 export function currentPasswordErrorMessage(error) {
   if (error.status === 429) return "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.";
   if (error.status === 400 || /invalid login credentials/i.test(error.message || "")) {

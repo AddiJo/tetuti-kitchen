@@ -26,6 +26,7 @@ import {
   passwordChangeProblem,
   passwordErrorMessage,
   priceLabel,
+  randomPassword,
   toJakartaInput,
   uniqueSlug,
   waLink,
@@ -80,6 +81,8 @@ const toastEl = document.getElementById("toast");
 const cancelDialog = document.getElementById("cancel-dialog");
 const paidDialog = document.getElementById("paid-dialog");
 const soundToggle = document.getElementById("sound-toggle");
+const menuToggle = document.getElementById("menu-toggle");
+const navMenu = document.getElementById("nav-menu");
 
 const BASE_TITLE = document.title;
 
@@ -126,6 +129,12 @@ function toast(text) {
   toastTimer = setTimeout(() => {
     toastEl.hidden = true;
   }, 2600);
+}
+
+function setMenu(open) {
+  navMenu.hidden = !open;
+  menuToggle.setAttribute("aria-expanded", String(open));
+  menuToggle.setAttribute("aria-label", open ? "Tutup menu" : "Buka menu");
 }
 
 function flashHtml() {
@@ -312,6 +321,7 @@ async function signOut(notice) {
 function renderLogin(notice) {
   state.signedIn = false;
   stopWatching();
+  setMenu(false);
   topbar.hidden = true;
   renderSeq += 1;
   app.innerHTML = `
@@ -2049,11 +2059,118 @@ async function renderMenuForm(id) {
 // perangkat lain; baru ketahuan saat dicek ke server Auth.
 async function sessionRevoked() {
   const { error } = await supabase.auth.getUser();
-  return error?.name === "AuthSessionMissingError";
+  // Akun yang aksesnya dicabut ikut terhapus, jadi pemiliknya tidak ditemukan.
+  return error?.name === "AuthSessionMissingError" || error?.code === "user_not_found";
 }
 
 async function checkRevoked() {
   if (state.signedIn && (await sessionRevoked()) && state.signedIn) signOut(REVOKED_MESSAGE);
+}
+
+// Membuat dan menghapus akun butuh kunci rahasia, jadi dikerjakan Edge
+// Function kelola-admin (supabase/functions/kelola-admin), bukan di browser.
+async function callAdmins(body) {
+  const { data, error } = await supabase.functions.invoke("kelola-admin", { body });
+  if (!error) return { admins: data.admins };
+  const response = error.context instanceof Response ? error.context : null;
+  const payload = response ? await response.json().catch(() => null) : null;
+  if (payload?.error) return { error: payload.error };
+  if (response?.status === 404) return { error: "Fungsi kelola-admin belum dipasang di Supabase." };
+  if (response?.status === 401) return { error: "Sesi habis. Silakan masuk lagi." };
+  return {
+    error: "Fungsi kelola akun tidak bisa dihubungi. Periksa internet, lalu pastikan kelola-admin sudah dipasang di Supabase.",
+  };
+}
+
+function adminRowHtml(account) {
+  const seen = account.last_sign_in_at ? `Terakhir masuk ${formatDate(account.last_sign_in_at)}` : "Belum pernah masuk";
+  return `
+    <div class="admin-row">
+      <span class="admin-who">
+        <span class="row"><strong>${esc(account.email ?? "(tanpa email)")}</strong>${
+          account.self ? `<span class="tag">Anda</span>` : ""
+        }</span>
+        <span class="small muted">${esc(seen)}</span>
+      </span>
+      ${account.self ? "" : `<button class="btn ghost" type="button" data-remove="${esc(account.id)}">Cabut akses</button>`}
+    </div>`;
+}
+
+function bindAdminAccounts(seq) {
+  const listEl = app.querySelector("[data-admins]");
+  const listError = app.querySelector("[data-admins-error]");
+  const form = app.querySelector("#add-admin-form");
+  const errorEl = form.querySelector("[data-error]");
+  const submit = form.querySelector('button[type="submit"]');
+  let accounts = [];
+
+  const show = (list) => {
+    accounts = list;
+    listEl.innerHTML = list.map(adminRowHtml).join("");
+  };
+
+  callAdmins({ action: "list" }).then((result) => {
+    if (seq !== renderSeq) return;
+    if (result.error) {
+      listEl.innerHTML = "";
+      return showError(listError, result.error);
+    }
+    show(result.admins);
+  });
+
+  listEl.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-remove]");
+    if (!button) return;
+    const account = accounts.find((item) => item.id === button.dataset.remove);
+    const name = account?.email ?? "akun ini";
+    if (!window.confirm(`Cabut akses ${name}? Akunnya dihapus dan langsung tidak bisa membuka admin.`)) return;
+    button.disabled = true;
+    listError.hidden = true;
+    const result = await callAdmins({ action: "remove", user_id: button.dataset.remove });
+    if (seq !== renderSeq) return;
+    if (result.error) {
+      button.disabled = false;
+      return showError(listError, result.error);
+    }
+    show(result.admins);
+    toast(`Akses ${name} dicabut`);
+  });
+
+  form.querySelector("[data-generate]").addEventListener("click", () => {
+    form.elements.password.value = randomPassword();
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+    form.querySelector("[data-created]")?.remove();
+    const email = form.elements.email.value.trim().toLowerCase();
+    const password = form.elements.password.value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError(errorEl, "Email tidak valid.");
+    if (password.length < PASSWORD_MIN) {
+      return showError(errorEl, `Sandi sementara minimal ${PASSWORD_MIN} karakter.`);
+    }
+    if (password.length > PASSWORD_MAX) {
+      return showError(errorEl, `Sandi sementara maksimal ${PASSWORD_MAX} karakter.`);
+    }
+
+    submit.disabled = true;
+    submit.textContent = "Menambah akun…";
+    const result = await callAdmins({ action: "create", email, password });
+    submit.disabled = false;
+    submit.textContent = "Tambah akun";
+    if (seq !== renderSeq) return;
+    if (result.error) return showError(errorEl, result.error);
+
+    show(result.admins);
+    form.reset();
+    // Sandi sementara hanya tampil di sini, jadi admin perlu menyalinnya sekarang.
+    submit.insertAdjacentHTML(
+      "beforebegin",
+      `<p class="notice ok" data-created>Akun <strong>${esc(email)}</strong> dibuat dengan sandi sementara
+        <span class="code">${esc(password)}</span>. Kirim ke orangnya, lalu minta dia mengganti sandi di halaman Akun.</p>`
+    );
+  });
 }
 
 async function renderAccount() {
@@ -2089,7 +2206,32 @@ async function renderAccount() {
         <p class="error" data-error hidden></p>
         <button class="btn primary full" type="submit">Ganti sandi</button>
       </form>
+      <div class="card stack">
+        <h2>Akun admin</h2>
+        <p class="small muted">Semua akun admin punya akses yang sama, termasuk menambah dan mencabut akun.</p>
+        <div class="admin-list" data-admins><p class="small muted">Memuat…</p></div>
+        <p class="error" data-admins-error hidden></p>
+      </div>
+      <form id="add-admin-form" class="card stack" novalidate>
+        <h2>Tambah akun</h2>
+        <label class="field">
+          <span>Email</span>
+          <input class="input" type="email" name="email" autocomplete="off" required />
+        </label>
+        <div class="field">
+          <label class="label" for="new-admin-password">Sandi sementara</label>
+          <div class="row">
+            <input class="input" id="new-admin-password" type="text" name="password" autocomplete="off" spellcheck="false" required />
+            <button class="btn" type="button" data-generate>Buat acak</button>
+          </div>
+          <span class="small muted">Berikan email dan sandi ini ke orangnya, lalu minta dia menggantinya di halaman Akun.</span>
+        </div>
+        <p class="error" data-error hidden></p>
+        <button class="btn primary full" type="submit">Tambah akun</button>
+      </form>
     </section>`;
+
+  bindAdminAccounts(seq);
 
   const form = app.querySelector("#password-form");
   const fields = form.elements;
@@ -2179,6 +2321,19 @@ window.addEventListener("hashchange", () => {
 });
 
 document.getElementById("logout").addEventListener("click", () => signOut("Anda sudah keluar."));
+
+menuToggle.addEventListener("click", () => setMenu(navMenu.hidden));
+navMenu.addEventListener("click", (event) => {
+  if (event.target.closest("a, button")) setMenu(false);
+});
+document.addEventListener("click", (event) => {
+  if (!navMenu.hidden && !event.target.closest("#nav-menu, #menu-toggle")) setMenu(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || navMenu.hidden) return;
+  setMenu(false);
+  menuToggle.focus();
+});
 
 // Titik kuning berarti bunyi menyala tapi belum diizinkan browser; ketukan
 // pada lonceng saat itu menyalakan bunyi, bukan mematikannya.

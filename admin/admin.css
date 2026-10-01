@@ -76,29 +76,74 @@ p {
   white-space: nowrap;
 }
 
-@media (max-width: 420px) {
-  .brand-extra {
-    display: none;
-  }
-}
-
-.topnav {
+.topbar-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
-.topnav a {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 14px;
+.topbar .menu-toggle {
+  display: inline-flex;
+  padding: 7px;
+}
+
+.menu-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.topbar .menu-toggle[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.nav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 10px 30px rgba(42, 22, 18, 0.18);
+}
+
+.nav-menu a,
+.topbar .nav-menu button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
   font-weight: 600;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.topnav a[aria-current="page"] {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 5px;
+.nav-menu a:hover,
+.topbar .nav-menu button:hover {
+  background: var(--bg);
+}
+
+.nav-menu a[aria-current="page"] {
+  background: #f3e3dc;
+  color: var(--brand);
+}
+
+.topbar .nav-menu button {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  color: var(--danger);
 }
 
 .topbar .icon-toggle {
@@ -701,6 +746,41 @@ textarea.input,
   border-radius: 6px;
   background: var(--paper);
   font-size: 14px;
+}
+
+.notice.ok {
+  border-left-color: var(--ok);
+  background: #e6f2e8;
+}
+
+.row > .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-row:first-child {
+  border-top: 0;
+}
+
+.admin-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .notice.error,
