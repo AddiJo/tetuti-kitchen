@@ -32,7 +32,7 @@ Halaman admin tidak boleh dibuka ke internet sebelum ada masuk akun, jadi masuk 
 | --- | --- | --- |
 | 1 | Pesanan masuk: login, harga menu, pesanan situs otomatis, bunyi pesanan baru, catat manual, status | Pembeli memesan di situs dan pesanannya muncul sendiri di dashboard dengan bunyi. Harga yang diubah admin tampil di situs. |
 | 2 | Kelola menu lengkap, buat tagihan | Menu bisa ditambah, disembunyikan, dan diberi foto dari admin. Dari pesanan terkonfirmasi bisa dibuat tagihan dan dikirim ke WhatsApp pembeli. |
-| 3 | Atur ulang sandi, laporan penjualan | Sandi bisa diganti saat sudah masuk. Ada ringkasan hari ini, rekap periode, dan menu terlaris. |
+| 3 | Atur ulang sandi, laporan penjualan | Sandi bisa diganti saat sudah masuk. Ada dashboard laporan dengan rentang waktu pilihan, grafik tren, menu terlaris, dan ekspor CSV. |
 | 4 | Pengaturan toko | Nama toko, nomor WhatsApp, area, dan info pembayaran di situs mengikuti isian admin. |
 
 Urutan kerja sisa fase 1:
@@ -200,12 +200,16 @@ Di admin:
 
 Pesanan batal tidak dihitung. Omzet dari tagihan lunas, dihitung di tanggal bayar (waktu lunas), bukan tanggal pesanan. Hari ini mengikuti zona waktu Jakarta. (Keputusan pemilik, 1 Okt 2026.)
 
-- Halaman Laporan (`#/laporan`, di menu ☰) untuk semua admin. Angka dihitung fungsi database `sales_report()` (security invoker, jadi hanya admin yang mendapat angka).
-- Ringkasan hari ini: pesanan masuk hari ini, belum selesai (semua pesanan Baru, Dikonfirmasi, Diproses), omzet lunas hari ini, dan nominal belum dibayar (semua tagihan Terkirim).
-- 30 hari terakhir: total pesanan, total omzet, dan sumber pesanan (situs atau dicatat admin, dengan persentase).
-- Rekap harian: tabel 30 hari, terbaru di atas, berisi jumlah pesanan (menurut tanggal pesanan dibuat) dan omzet (menurut tanggal lunas). Hari tanpa pesanan dan omzet tampil pudar.
-- Menu terlaris: peringkat menurut jumlah porsi dari pesanan 30 hari terakhir, termasuk menu yang disembunyikan. Nama mengikuti nama menu sekarang; item tanpa menu (dihapus atau diketik bebas) dikelompokkan menurut namanya.
-- Belum lunas: tagihan Terkirim, yang paling lama dikirim di atas, menautkan ke pesanannya.
+- Halaman Laporan (`#/laporan`, di menu ☰) untuk semua admin, berbentuk dashboard: angka besar dan grafik, bukan daftar teks. Di laptop halaman ini lebih lebar dan kartunya berdampingan; di HP bertumpuk. (Permintaan pemilik, 2 Okt 2026, menggantikan rekap tetap 30 hari.)
+- Rentang waktu: tombol cepat Hari ini, 7 hari, 30 hari (bawaan), Bulan ini, Bulan lalu, 90 hari, Tahun ini, dan Pilih tanggal (dari–sampai, paling panjang dua tahun, tidak melewati hari ini). Semua isi halaman mengikuti rentang, kecuali Belum lunas.
+- Angka dihitung fungsi database `sales_report(start_day, end_day)` (migrasi `20261002000000_laporan_rentang.sql`, security invoker, jadi hanya admin yang mendapat angka).
+- Kartu angka: Omzet dan Pesanan, masing-masing dengan persen naik/turun dibanding periode sebelumnya yang sama panjang (misalnya 30 hari sebelumnya). Kalau periode sebelumnya nol, persen tidak ditampilkan.
+- Grafik tren: omzet atau pesanan (tombol Omzet/Pesanan), per hari sampai 62 hari, per minggu (mulai Senin) sampai 186 hari, selebihnya per bulan. Ketuk atau arahkan ke titik untuk melihat tanggal, omzet, dan jumlah pesanannya. Grafik digambar sendiri dengan SVG, tanpa pustaka tambahan.
+- Sumber pesanan: grafik batang situs dibanding dicatat admin, dengan persentase.
+- Menu terlaris: peringkat menurut jumlah porsi, termasuk menu yang disembunyikan. Nama mengikuti nama menu sekarang; item tanpa menu (dihapus atau diketik bebas) dikelompokkan menurut namanya.
+- Belum lunas: semua tagihan Terkirim dari tanggal berapa pun, yang paling lama dikirim di atas, dengan totalnya, menautkan ke pesanannya.
+- Daftar pesanan: pesanan (tanpa yang batal) yang dibuat di rentang itu, terbaru di atas, 10 per halaman, dengan pencarian kode, nama, atau menu. Kolom: kode, tanggal, pelanggan, item, total, status pesanan, status bayar.
+- Ekspor CSV: daftar pesanan sesuai pencarian, dipisah titik koma dan berawalan BOM supaya langsung terbaca Excel berbahasa Indonesia. Kolom tambahan: WhatsApp, sumber, kode dan status tagihan, nominal diterima, tanggal lunas. Teks yang diawali `=`, `+`, `-`, atau `@` diberi tanda kutip tunggal supaya tidak dijalankan Excel sebagai rumus.
 
 ## Fase 4 — Pengaturan toko
 
@@ -316,4 +320,5 @@ Fase 3, langkah 1 — ganti sandi:
 Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di tanggal bayar; rekap periode 30 hari terakhir.
 
 - [x] Agen: halaman Laporan dan fungsi `sales_report()` (migrasi `20261001010000_laporan.sql`).
-- [ ] Pemilik: jalankan migrasi laporan, push, lalu cocokkan angka Laporan dengan pesanan dan tagihan yang ada.
+- [x] Agen: dashboard laporan dengan rentang waktu, grafik, daftar pesanan, dan ekspor CSV (migrasi `20261002000000_laporan_rentang.sql`, menggantikan fungsi laporan sebelumnya).
+- [ ] Pemilik: jalankan migrasi laporan rentang, push, lalu cocokkan angka Laporan dengan pesanan dan tagihan yang ada, dan buka file CSV di Excel.

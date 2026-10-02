@@ -6,8 +6,11 @@ import {
   errorMessage,
   esc,
   formatDate,
+  bucketLabel,
+  bucketTitle,
+  csvText,
   formatDay,
-  formatReportDay,
+  formatRange,
   formatRp,
   fromJakartaInput,
   invoiceCaption,
@@ -17,17 +20,24 @@ import {
   invoiceLines,
   invoiceMessage,
   isValidPhone,
+  jakartaToday,
   loginErrorMessage,
   menuImageSrc,
   METHOD_LABEL,
+  niceTicks,
   normalizePhone,
   parseRupiah,
   PASSWORD_MAX,
   PASSWORD_MIN,
   passwordChangeProblem,
   passwordErrorMessage,
+  percentChange,
+  presetRange,
   priceLabel,
   randomPassword,
+  rangeProblem,
+  REPORT_PRESETS,
+  shortNumber,
   toJakartaInput,
   uniqueSlug,
   waLink,
@@ -101,6 +111,7 @@ const state = {
   paidInvoice: null,
   // Browser memakai judul halaman sebagai nama file saat Simpan sebagai PDF.
   printTitle: null,
+  report: { preset: "30-hari", start: "", end: "", metric: "revenue", search: "", page: 0, data: null },
 };
 
 // Setiap render menaikkan nomor ini; hasil fetch yang datang setelah pindah
@@ -324,6 +335,7 @@ function renderLogin(notice) {
   stopWatching();
   setMenu(false);
   topbar.hidden = true;
+  app.classList.remove("wide");
   renderSeq += 1;
   app.innerHTML = `
     <section class="page login">
@@ -2301,17 +2313,44 @@ async function renderAccount() {
 
 // Laporan --------------------------------------------------------------------
 
-function statHtml(label, value, hint = "") {
+const REPORT_PAGE_SIZE = 10;
+const STEP_LABEL = { day: "per hari", week: "per minggu", month: "per bulan" };
+const PAY_LABEL = { draft: "Draft", terkirim: "Belum bayar", lunas: "Lunas" };
+
+function kpiHtml(label, value, current, previous) {
+  const change = percentChange(current, previous);
+  const trend =
+    change == null
+      ? `<span class="small muted">Periode sebelumnya kosong</span>`
+      : `<span class="small ${change > 0 ? "up" : change < 0 ? "down" : "muted"}">${
+          change > 0 ? "▲" : change < 0 ? "▼" : "="
+        } ${Math.abs(change)}% <span class="muted">vs periode sebelumnya</span></span>`;
   return `
-    <div class="stat">
+    <div class="card kpi">
       <span class="small muted">${esc(label)}</span>
       <strong>${esc(value)}</strong>
-      ${hint ? `<span class="small muted">${esc(hint)}</span>` : ""}
+      ${trend}
     </div>`;
 }
 
+function reportSourcesHtml(sources) {
+  const total = sources.situs + sources.admin;
+  if (!total) return `<p class="small muted">Belum ada pesanan di rentang ini.</p>`;
+  const column = (label, count) => {
+    const share = Math.round((count / total) * 100);
+    return `
+      <div class="vbar">
+        <strong>${share}%</strong>
+        <span class="vbar-track"><span style="height: ${Math.max(2, share)}%"></span></span>
+        <span class="small">${esc(label)}</span>
+        <span class="small muted">${count} pesanan</span>
+      </div>`;
+  };
+  return `<div class="vbars">${column("Situs", sources.situs)}${column("Dicatat admin", sources.admin)}</div>`;
+}
+
 function reportMenuHtml(menu) {
-  if (!menu.length) return `<p class="small muted">Belum ada pesanan dalam 30 hari terakhir.</p>`;
+  if (!menu.length) return `<p class="small muted">Belum ada pesanan di rentang ini.</p>`;
   const top = menu[0].portions;
   const rows = menu
     .map(
@@ -2344,85 +2383,362 @@ function reportUnpaidHtml(unpaid) {
     .join("");
 }
 
-function reportDaysHtml(days) {
-  return days
+// Lebar SVG mengikuti lebar kotaknya supaya tulisan sumbu tetap terbaca di HP.
+function drawTrend() {
+  const report = state.report.data;
+  const box = app.querySelector("[data-chart]");
+  if (!report || !box) return;
+  const metric = state.report.metric;
+  const series = report.series;
+  const values = series.map((point) => point[metric]);
+  const money = metric === "revenue";
+  const ticks = niceTicks(Math.max(...values) || (money ? 100_000 : 4), 4, !money);
+  const top = ticks[ticks.length - 1];
+  const tickLabel = (value) => (money ? shortNumber(value) : String(value));
+
+  const width = Math.max(260, box.clientWidth);
+  const height = 220;
+  const pad = { top: 14, right: 14, bottom: 26, left: money ? 46 : 30 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const last = values.length - 1;
+  const x = (i) => pad.left + (last ? (i * innerW) / last : innerW / 2);
+  const y = (value) => pad.top + innerH - (value / top) * innerH;
+  const base = pad.top + innerH;
+
+  const grid = ticks
     .map(
-      (day) => `
-        <tr${day.orders || day.revenue ? "" : ` class="quiet"`}>
-          <td>${esc(formatReportDay(day.day))}</td>
-          <td class="num">${day.orders}</td>
-          <td class="num">${esc(formatRp(day.revenue))}</td>
-        </tr>`
+      (tick) => `
+        <line class="chart-grid" x1="${pad.left}" x2="${width - pad.right}" y1="${y(tick)}" y2="${y(tick)}" />
+        <text class="chart-axis" x="${pad.left - 6}" y="${y(tick) + 4}" text-anchor="end">${esc(tickLabel(tick))}</text>`
     )
     .join("");
+  const every = Math.ceil(values.length / Math.max(2, Math.floor(innerW / 64)));
+  const shown = series.map((_, i) => i).filter((i) => i % every === 0);
+  if (shown[shown.length - 1] !== last) {
+    if (x(last) - x(shown[shown.length - 1]) < 56) shown[shown.length - 1] = last;
+    else shown.push(last);
+  }
+  const labels = shown
+    .map(
+      (i) => `<text class="chart-axis" x="${x(i)}" y="${height - 6}" text-anchor="${
+        last && i === 0 ? "start" : last && i === last ? "end" : "middle"
+      }">${esc(bucketLabel(series[i].start, report.step))}</text>`
+    )
+    .join("");
+  const line = values.map((value, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(last).toFixed(1)} ${base} L${x(0).toFixed(1)} ${base} Z`;
+  const dots =
+    values.length <= 31
+      ? values.map((value, i) => `<circle class="chart-dot" cx="${x(i)}" cy="${y(value)}" r="2.5" />`).join("")
+      : "";
+
+  box.innerHTML = `
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"
+      aria-label="Tren ${money ? "omzet" : "pesanan"} ${esc(STEP_LABEL[report.step])}">
+      <defs>
+        <linearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stop-color="#6a1010" stop-opacity="0.22" />
+          <stop offset="1" stop-color="#6a1010" stop-opacity="0.02" />
+        </linearGradient>
+      </defs>
+      ${grid}
+      ${values.length > 1 ? `<path class="chart-area" d="${area}" /><path class="chart-line" d="${line}" />` : ""}
+      ${dots}
+      ${labels}
+      <line class="chart-cursor" y1="${pad.top}" y2="${base}" hidden />
+      <circle class="chart-focus" r="5" hidden />
+    </svg>
+    <div class="chart-tip" hidden></div>`;
+
+  const svg = box.querySelector("svg");
+  const cursor = svg.querySelector(".chart-cursor");
+  const focus = svg.querySelector(".chart-focus");
+  const tip = box.querySelector(".chart-tip");
+  const show = (event) => {
+    const rect = svg.getBoundingClientRect();
+    const i = last ? Math.min(last, Math.max(0, Math.round(((event.clientX - rect.left - pad.left) / innerW) * last))) : 0;
+    const point = series[i];
+    cursor.setAttribute("x1", x(i));
+    cursor.setAttribute("x2", x(i));
+    focus.setAttribute("cx", x(i));
+    focus.setAttribute("cy", y(values[i]));
+    cursor.removeAttribute("hidden");
+    focus.removeAttribute("hidden");
+    tip.innerHTML = `<strong>${esc(bucketTitle(point.start, report.step))}</strong><br />${esc(
+      formatRp(point.revenue)
+    )} · ${point.orders} pesanan`;
+    tip.hidden = false;
+    const left = Math.min(width - tip.offsetWidth - 4, Math.max(4, x(i) - tip.offsetWidth / 2));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${Math.max(0, y(values[i]) - tip.offsetHeight - 12)}px`;
+  };
+  svg.addEventListener("pointermove", show);
+  svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointerleave", (event) => {
+    if (event.pointerType !== "mouse") return;
+    tip.hidden = true;
+    cursor.setAttribute("hidden", "");
+    focus.setAttribute("hidden", "");
+  });
+}
+
+function reportRows() {
+  const query = state.report.search.trim().toLowerCase();
+  const rows = state.report.data?.list ?? [];
+  if (!query) return rows;
+  return rows.filter((row) =>
+    [row.code, row.customer_name, row.items_label, row.invoice_code].some((text) =>
+      String(text ?? "").toLowerCase().includes(query)
+    )
+  );
+}
+
+function payTag(row) {
+  if (!row.invoice_status) return `<span class="small muted">Belum ada tagihan</span>`;
+  const tone = row.invoice_status === "lunas" ? " paid" : row.invoice_status === "terkirim" ? " unpaid" : " muted-tag";
+  return `<span class="tag${tone}">${PAY_LABEL[row.invoice_status]}</span>`;
+}
+
+function reportTableHtml() {
+  const rows = reportRows();
+  const pages = Math.max(1, Math.ceil(rows.length / REPORT_PAGE_SIZE));
+  state.report.page = Math.min(state.report.page, pages - 1);
+  const from = state.report.page * REPORT_PAGE_SIZE;
+  const shown = rows.slice(from, from + REPORT_PAGE_SIZE);
+  const body = shown.length
+    ? shown
+        .map(
+          (row) => `
+            <tr>
+              <td><a class="code" href="#/pesanan/${esc(row.id)}">${esc(row.code)}</a></td>
+              <td class="nowrap">${esc(formatDate(row.created_at))}</td>
+              <td>${esc(row.customer_name)}</td>
+              <td class="items-cell">${esc(row.items_label ?? "—")}</td>
+              <td class="num">${row.total == null ? "—" : esc(formatRp(row.total))}</td>
+              <td>${statusPill(row.status)}</td>
+              <td>${payTag(row)}</td>
+            </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="7" class="empty">${
+        state.report.search.trim() ? "Tidak ada pesanan yang cocok." : "Belum ada pesanan di rentang ini."
+      }</td></tr>`;
+  const count = rows.length ? `${from + 1}–${from + shown.length} dari ${rows.length}` : "0 pesanan";
+  return `
+    <div class="table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr><th>Kode</th><th>Tanggal</th><th>Pelanggan</th><th>Item</th><th class="num">Total</th><th>Status</th><th>Bayar</th></tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+    <div class="row between">
+      <span class="small muted">${esc(count)}</span>
+      <span class="row">
+        <button class="btn ghost" type="button" data-page="-1" ${state.report.page === 0 ? "disabled" : ""}>‹ Sebelumnya</button>
+        <button class="btn ghost" type="button" data-page="1" ${state.report.page >= pages - 1 ? "disabled" : ""}>Berikutnya ›</button>
+      </span>
+    </div>`;
+}
+
+function exportReportCsv() {
+  const { start, end } = state.report;
+  const jakarta = (iso) => (iso ? toJakartaInput(iso).replace("T", " ") : "");
+  const rows = [
+    [
+      "Kode pesanan", "Tanggal pesan", "Pelanggan", "WhatsApp", "Sumber", "Status pesanan", "Item", "Total",
+      "Kode tagihan", "Status tagihan", "Nominal diterima", "Tanggal lunas",
+    ],
+    ...reportRows().map((row) => [
+      row.code,
+      jakarta(row.created_at),
+      row.customer_name,
+      row.customer_phone,
+      row.source === "situs" ? "Situs" : "Dicatat admin",
+      STATUS_LABEL[row.status],
+      row.items_label,
+      row.total,
+      row.invoice_code,
+      row.invoice_status ? INVOICE_STATUS_LABEL[row.invoice_status] : "",
+      row.paid_amount,
+      jakarta(row.paid_at),
+    ]),
+  ];
+  const url = URL.createObjectURL(new Blob([csvText(rows)], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `laporan-tetuti-${start}-sd-${end}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function reportBodyHtml(report) {
+  const money = state.report.metric === "revenue";
+  return `
+    <div class="kpis">
+      ${kpiHtml("Omzet", formatRp(report.revenue), report.revenue, report.prev_revenue)}
+      ${kpiHtml("Pesanan", String(report.orders), report.orders, report.prev_orders)}
+    </div>
+    <p class="small muted">
+      Dibanding ${esc(formatRange(report.prev_start_day, report.prev_end_day))}. Pesanan batal tidak dihitung.
+      Omzet adalah nominal yang diterima dari tagihan lunas, dihitung di tanggal lunasnya.
+    </p>
+
+    <div class="dash-grid">
+      <div class="card stack">
+        <div class="row between wrap">
+          <h2>Tren ${money ? "omzet" : "pesanan"} <span class="small muted">${esc(STEP_LABEL[report.step])}</span></h2>
+          <div class="seg-toggle" role="group" aria-label="Isi grafik">
+            <button type="button" data-metric="revenue" aria-pressed="${money}">Omzet</button>
+            <button type="button" data-metric="orders" aria-pressed="${!money}">Pesanan</button>
+          </div>
+        </div>
+        <div class="chart" data-chart></div>
+      </div>
+      <div class="card stack">
+        <h2>Sumber pesanan</h2>
+        ${reportSourcesHtml(report.sources)}
+      </div>
+    </div>
+
+    <div class="dash-grid even">
+      <div class="card stack">
+        <h2>Menu terlaris</h2>
+        ${reportMenuHtml(report.menu)}
+      </div>
+      <div class="card stack">
+        <h2>Belum lunas <span class="small muted">${esc(formatRp(report.unpaid_total))}, semua tanggal</span></h2>
+        <div class="admin-list">${reportUnpaidHtml(report.unpaid)}</div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <div class="row between wrap">
+        <h2>Daftar pesanan</h2>
+        <div class="row">
+          <input class="input search-input" type="search" placeholder="Cari kode, nama, menu" aria-label="Cari pesanan"
+            value="${esc(state.report.search)}" data-report-search />
+          <button class="btn primary" type="button" data-export ${report.list.length ? "" : "disabled"}>Ekspor CSV</button>
+        </div>
+      </div>
+      <div data-report-table>${reportTableHtml()}</div>
+    </div>`;
+}
+
+function bindReportBody() {
+  app.querySelectorAll("[data-metric]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.report.metric === button.dataset.metric) return;
+      state.report.metric = button.dataset.metric;
+      app.querySelectorAll("[data-metric]").forEach((el) => {
+        el.setAttribute("aria-pressed", String(el === button));
+      });
+      const heading = button.closest(".card").querySelector("h2");
+      heading.firstChild.textContent = `Tren ${state.report.metric === "revenue" ? "omzet" : "pesanan"} `;
+      drawTrend();
+    });
+  });
+
+  const tableBox = app.querySelector("[data-report-table]");
+  app.querySelector("[data-report-search]").addEventListener("input", (event) => {
+    state.report.search = event.target.value;
+    state.report.page = 0;
+    tableBox.innerHTML = reportTableHtml();
+  });
+  tableBox.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button) return;
+    state.report.page += Number(button.dataset.page);
+    tableBox.innerHTML = reportTableHtml();
+  });
+  app.querySelector("[data-export]").addEventListener("click", exportReportCsv);
 }
 
 async function renderReport() {
   const seq = ++renderSeq;
-  app.innerHTML = `<p class="page muted">Memuat…</p>`;
-  const { data: report, error } = await supabase.rpc("sales_report");
-  if (seq !== renderSeq) return;
-  if (error) {
-    return renderProblem(
-      error.code === "PGRST202"
-        ? "Migration laporan belum dijalankan di Supabase."
-        : `Laporan gagal dimuat. ${errorMessage(error)}`
-    );
-  }
-
-  const periodOrders = report.days.reduce((sum, day) => sum + day.orders, 0);
-  const periodRevenue = report.days.reduce((sum, day) => sum + day.revenue, 0);
-  const sourceTotal = report.sources.situs + report.sources.admin;
-  const share = (count) => (sourceTotal ? ` (${Math.round((count / sourceTotal) * 100)}%)` : "");
+  const view = state.report;
+  const today = jakartaToday();
+  if (view.preset !== "pilih") Object.assign(view, presetRange(view.preset, today));
+  view.data = null;
 
   app.innerHTML = `
     <section class="page">
-      <h1>Laporan</h1>
-      <p class="small muted">
-        Pesanan batal tidak dihitung. Omzet adalah nominal yang diterima dari tagihan lunas, dihitung di tanggal lunasnya.
-      </p>
-
-      <div class="card stack">
-        <h2>Hari ini <span class="small muted">${esc(formatDay(report.today))}</span></h2>
-        <div class="stats">
-          ${statHtml("Pesanan masuk", String(report.orders_today))}
-          ${statHtml("Belum selesai", String(report.open_orders), "Baru, Dikonfirmasi, Diproses")}
-          ${statHtml("Omzet lunas", formatRp(report.paid_today))}
-          ${statHtml("Belum dibayar", formatRp(report.unpaid_total), "Semua tagihan terkirim")}
+      <div class="row between wrap">
+        <h1>Laporan</h1>
+        <span class="small muted">${esc(formatRange(view.start, view.end))}</span>
+      </div>
+      <div class="chips" role="group" aria-label="Rentang waktu">
+        ${REPORT_PRESETS.map(
+          (preset) =>
+            `<button type="button" class="chip" data-preset="${preset.id}" aria-pressed="${view.preset === preset.id}">${esc(
+              preset.label
+            )}</button>`
+        ).join("")}
+        <button type="button" class="chip" data-preset="pilih" aria-pressed="${view.preset === "pilih"}">Pilih tanggal</button>
+      </div>
+      <form class="card range-form" data-range ${view.preset === "pilih" ? "" : "hidden"} novalidate>
+        <div class="row wrap">
+          <label class="field"><span>Dari</span>
+            <input class="input" type="date" name="start" value="${esc(view.start)}" max="${today}" required /></label>
+          <label class="field"><span>Sampai</span>
+            <input class="input" type="date" name="end" value="${esc(view.end)}" max="${today}" required /></label>
+          <button class="btn primary" type="submit">Terapkan</button>
         </div>
-      </div>
-
-      <div class="card stack">
-        <h2>30 hari terakhir <span class="small muted">${esc(formatReportDay(report.first_day))} – ${esc(
-          formatReportDay(report.today)
-        )}</span></h2>
-        <div class="stats">
-          ${statHtml("Pesanan", String(periodOrders))}
-          ${statHtml("Omzet", formatRp(periodRevenue))}
-          ${statHtml("Dari situs", `${report.sources.situs}${share(report.sources.situs)}`)}
-          ${statHtml("Dicatat admin", `${report.sources.admin}${share(report.sources.admin)}`)}
-        </div>
-      </div>
-
-      <div class="card stack">
-        <h2>Menu terlaris <span class="small muted">30 hari terakhir</span></h2>
-        ${reportMenuHtml(report.menu)}
-      </div>
-
-      <div class="card stack">
-        <h2>Belum lunas <span class="small muted">paling lama di atas</span></h2>
-        <div class="admin-list">${reportUnpaidHtml(report.unpaid)}</div>
-      </div>
-
-      <div class="card stack">
-        <h2>Rekap harian</h2>
-        <table class="report-days">
-          <thead><tr><th>Tanggal</th><th class="num">Pesanan</th><th class="num">Omzet</th></tr></thead>
-          <tbody>${reportDaysHtml(report.days)}</tbody>
-        </table>
-      </div>
+        <p class="error" data-error hidden></p>
+      </form>
+      <div class="stack" data-report><p class="muted">Memuat…</p></div>
     </section>`;
+
+  const rangeForm = app.querySelector("[data-range]");
+  app.querySelectorAll("[data-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.preset === "pilih") {
+        rangeForm.hidden = false;
+        rangeForm.elements.start.focus();
+        return;
+      }
+      view.preset = button.dataset.preset;
+      view.page = 0;
+      renderReport();
+    });
+  });
+  rangeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const start = rangeForm.elements.start.value;
+    const end = rangeForm.elements.end.value;
+    const problem = rangeProblem(start, end, today);
+    if (problem) return showError(rangeForm.querySelector("[data-error]"), problem);
+    Object.assign(view, { preset: "pilih", start, end, page: 0 });
+    renderReport();
+  });
+
+  const { data, error } = await supabase.rpc("sales_report", { start_day: view.start, end_day: view.end });
+  if (seq !== renderSeq) return;
+  const box = app.querySelector("[data-report]");
+  if (error) {
+    const missing = error.code === "PGRST202";
+    box.innerHTML = `<p class="notice error">${esc(
+      missing ? "Migration laporan rentang belum dijalankan di Supabase." : `Laporan gagal dimuat. ${errorMessage(error)}`
+    )}</p>`;
+    return;
+  }
+  view.data = data;
+  box.innerHTML = reportBodyHtml(data);
+  bindReportBody();
+  drawTrend();
 }
+
+let resizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (state.report.data && location.hash === "#/laporan") drawTrend();
+  }, 150);
+});
 
 // Rute -----------------------------------------------------------------------
 
@@ -2445,6 +2761,7 @@ function route() {
     if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
+  app.classList.toggle("wide", section === "laporan");
 
   if (path === "/") return renderList();
   if (path === "/akun") return renderAccount();

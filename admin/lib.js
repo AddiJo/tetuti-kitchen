@@ -29,6 +29,16 @@ const reportDay = new Intl.DateTimeFormat("id-ID", {
   day: "numeric",
   month: "short",
 });
+const reportDate = new Intl.DateTimeFormat("id-ID", { timeZone: "UTC", day: "numeric", month: "short" });
+const reportMonth = new Intl.DateTimeFormat("id-ID", { timeZone: "UTC", month: "short" });
+const reportLongMonth = new Intl.DateTimeFormat("id-ID", { timeZone: "UTC", month: "long", year: "numeric" });
+const reportFullDate = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+const compact = new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 1 });
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -54,8 +64,116 @@ export function formatDay(iso) {
   return iso ? longDay.format(new Date(iso)) : "";
 }
 
-export function formatReportDay(day) {
-  return day ? reportDay.format(new Date(`${day}T00:00:00Z`)) : "";
+const utcDay = (day) => new Date(`${day}T00:00:00Z`);
+
+// Label sumbu grafik (pendek) dan label keterangan titik (lengkap).
+export function bucketLabel(start, step) {
+  return step === "month" ? reportMonth.format(utcDay(start)) : reportDate.format(utcDay(start));
+}
+
+export function bucketTitle(start, step) {
+  if (step === "month") return reportLongMonth.format(utcDay(start));
+  if (step === "week") return `Minggu mulai ${reportDate.format(utcDay(start))}`;
+  return reportDay.format(utcDay(start));
+}
+
+export function formatRange(start, end) {
+  if (start === end) return reportFullDate.format(utcDay(start));
+  return `${reportFullDate.format(utcDay(start))} – ${reportFullDate.format(utcDay(end))}`;
+}
+
+export function shortNumber(value) {
+  return compact.format(value);
+}
+
+export function jakartaToday(now = new Date()) {
+  return new Date(now.getTime() + JAKARTA_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+export function addDays(day, count) {
+  const date = utcDay(day);
+  date.setUTCDate(date.getUTCDate() + count);
+  return date.toISOString().slice(0, 10);
+}
+
+export function daySpan(start, end) {
+  return Math.round((utcDay(end) - utcDay(start)) / 86_400_000) + 1;
+}
+
+export const REPORT_MAX_DAYS = 731;
+
+export const REPORT_PRESETS = [
+  { id: "hari-ini", label: "Hari ini" },
+  { id: "7-hari", label: "7 hari" },
+  { id: "30-hari", label: "30 hari" },
+  { id: "bulan-ini", label: "Bulan ini" },
+  { id: "bulan-lalu", label: "Bulan lalu" },
+  { id: "90-hari", label: "90 hari" },
+  { id: "tahun-ini", label: "Tahun ini" },
+];
+
+export function presetRange(id, today) {
+  const month = today.slice(0, 7);
+  switch (id) {
+    case "hari-ini":
+      return { start: today, end: today };
+    case "7-hari":
+      return { start: addDays(today, -6), end: today };
+    case "bulan-ini":
+      return { start: `${month}-01`, end: today };
+    case "bulan-lalu": {
+      const end = addDays(`${month}-01`, -1);
+      return { start: `${end.slice(0, 7)}-01`, end };
+    }
+    case "90-hari":
+      return { start: addDays(today, -89), end: today };
+    case "tahun-ini":
+      return { start: `${today.slice(0, 4)}-01-01`, end: today };
+    default:
+      return { start: addDays(today, -29), end: today };
+  }
+}
+
+export function rangeProblem(start, end, today) {
+  if (!start || !end) return "Isi tanggal awal dan tanggal akhir.";
+  if (start > end) return "Tanggal awal harus sama dengan atau sebelum tanggal akhir.";
+  if (end > today) return "Tanggal akhir tidak boleh melewati hari ini.";
+  if (daySpan(start, end) > REPORT_MAX_DAYS) return "Rentang laporan paling panjang dua tahun.";
+  return null;
+}
+
+// Persen naik/turun dibanding periode sebelumnya; kosong kalau pembandingnya nol.
+export function percentChange(current, previous) {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+// Garis bantu sumbu Y: kelipatan 1, 2, 2,5, atau 5 yang menutup nilai terbesar.
+// Untuk hitungan (whole) langkahnya bilangan bulat.
+export function niceTicks(max, count = 4, whole = false) {
+  if (!(max > 0)) return Array.from({ length: count + 1 }, (_, i) => i);
+  const rough = max / count;
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  let step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= rough);
+  if (whole) step = Math.max(1, Math.ceil(step));
+  const ticks = [];
+  for (let i = 0; i <= count; i++) ticks.push(Math.round(step * i * 1000) / 1000);
+  return ticks;
+}
+
+// Sel CSV untuk Excel berbahasa Indonesia (pemisah titik koma). Teks yang
+// diawali = + - @ diberi tanda kutip tunggal supaya tidak dijalankan sebagai
+// rumus, karena nama dan catatan pembeli diketik bebas dari situs.
+export function csvCell(value) {
+  if (value == null) return "";
+  if (typeof value === "number") return String(value);
+  let text = String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function csvText(rows) {
+  return `\ufeff${rows.map((row) => row.map(csvCell).join(";")).join("\r\n")}\r\n`;
 }
 
 // Menerima 0812…, 812…, +62 812…, atau 62812…; hasilnya selalu 62… tanpa spasi.
