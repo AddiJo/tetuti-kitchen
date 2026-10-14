@@ -33,7 +33,7 @@ Halaman admin tidak boleh dibuka ke internet sebelum ada masuk akun, jadi masuk 
 | 1 | Pesanan masuk: login, harga menu, pesanan situs otomatis, bunyi pesanan baru, catat manual, status | Pembeli memesan di situs dan pesanannya muncul sendiri di dashboard dengan bunyi. Harga yang diubah admin tampil di situs. |
 | 2 | Kelola menu lengkap, buat tagihan | Menu bisa ditambah, disembunyikan, dan diberi foto dari admin. Dari pesanan terkonfirmasi bisa dibuat tagihan dan dikirim ke WhatsApp pembeli. |
 | 3 | Atur ulang sandi, laporan penjualan | Sandi bisa diganti saat sudah masuk. Ada dashboard laporan dengan rentang waktu pilihan, grafik tren, menu terlaris, dan ekspor CSV. |
-| 4 | Pengaturan toko | Nama toko, nomor WhatsApp, area, dan info pembayaran di situs mengikuti isian admin. |
+| 4 | Pengaturan toko | Nama toko, teks hero, dan nomor WhatsApp di situs dan invoice mengikuti isian admin. Rekening, QRIS, dan tunai diatur admin dan menjadi pilihan saat buat tagihan. |
 
 Urutan kerja sisa fase 1:
 
@@ -151,7 +151,7 @@ Teks kartu, badge, dan foto pindah dari `js/products.js` ke database. `js/produc
 Tagihan hanya dari pesanan berstatus Dikonfirmasi, Diproses, atau Selesai.
 
 - Buat tagihan: satu pesanan satu tagihan aktif. Isinya menyalin item, ongkir, dan total.
-- Pilih cara bayar: transfer, QRIS, atau tunai. Sampai fase 4, admin mengisi instruksi singkat per tagihan. Tagihan baru dengan Transfer langsung terisi rekening bawaan `BRI 440701021532539 a.n. Sugiastuti` dan tetap bisa diubah. Pindah cara bayar ikut mengganti rekening bawaan, tapi tidak menimpa instruksi yang sudah ditulis admin. (Permintaan pemilik, 29 Sep 2026.)
+- Pilih cara bayar: transfer, QRIS, atau tunai, hanya yang aktif di Pengaturan (fase 4). Transfer memilih salah satu rekening; rekening paling atas terpilih otomatis. Instruksi terisi dari pengaturan (teks rekening, "Scan kode QRIS di invoice ini.", atau catatan tunai) dan tetap bisa diubah. Pindah cara bayar ikut mengganti instruksi bawaan, tapi tidak menimpa instruksi yang sudah ditulis admin. Tagihan menyimpan salinan teksnya, jadi mengubah pengaturan tidak mengubah tagihan lama. (Permintaan pemilik, 29 Sep dan 13 Okt 2026.)
 - Kirim tagihan: file PDF invoice dikirim ke WhatsApp pembeli. (Keputusan pemilik, 29 Sep 2026.)
 - Tandai lunas: nominal yang diterima dan waktu lunas. Tagihan lunas terkunci, kecuali lewat Batalkan lunas (dengan konfirmasi) yang mengembalikannya ke Terkirim untuk memperbaiki salah tandai. (Keputusan pemilik, 29 Sep 2026.)
 
@@ -174,7 +174,7 @@ Di admin:
 - Batalkan tagihan tetap ada karena itu satu-satunya cara mengganti tagihan terkirim yang salah isi (cara bayar terkunci setelah Draft, satu pesanan satu tagihan aktif), dan tautan PDF pembeli ikut bercap Dibatalkan.
 - Kalau item atau ongkir pesanan berubah setelah tagihan dibuat, detail pesanan memberi tanda dan tombol Buat ulang tagihan (tagihan lama dibatalkan, cara bayar dan instruksi dibawa).
 - Daftar pesanan memberi label Belum bayar (tagihan terkirim) atau Lunas.
-- Lihat invoice: dokumen tagihan berkop toko (nama, situs, WhatsApp dari `js/config.js`) berisi pembeli, tanggal, kode pesanan, tabel item, subtotal, ongkir, total, cara bayar, dan cap Belum dibayar, Lunas, atau Dibatalkan. Tombol Cetak / Simpan PDF memakai dialog cetak browser; nama file mengikuti kode tagihan. Tagihan Draft yang PDF-nya dikirim sendiri bisa ditandai terkirim dari halaman ini. (Permintaan pemilik, 29 Sep 2026.)
+- Lihat invoice: dokumen tagihan berkop toko (nama dan WhatsApp dari Pengaturan, situs dari `js/config.js`) berisi pembeli, tanggal, kode pesanan, tabel item, subtotal, ongkir, total, cara bayar, dan cap Belum dibayar, Lunas, atau Dibatalkan. Tombol Cetak / Simpan PDF memakai dialog cetak browser; nama file mengikuti kode tagihan. Tagihan Draft yang PDF-nya dikirim sendiri bisa ditandai terkirim dari halaman ini. (Permintaan pemilik, 29 Sep 2026.)
 
 ## Fase 3 — Sandi dan laporan
 
@@ -194,7 +194,7 @@ Di admin:
 
 ### Menu navigasi
 
-- Tombol ☰ di kanan atas, di semua ukuran layar, membuka daftar Pesanan, Menu, Laporan, Akun, dan Keluar. Lonceng bunyi tetap di luar menu. Menu tertutup saat item dipilih, saat mengetuk di luar menu, atau dengan tombol Esc. (Permintaan pemilik, 1 Okt 2026.)
+- Tombol ☰ di kanan atas, di semua ukuran layar, membuka daftar Pesanan, Menu, Laporan, Pengaturan, Akun, dan Keluar. Lonceng bunyi tetap di luar menu. Menu tertutup saat item dipilih, saat mengetuk di luar menu, atau dengan tombol Esc. (Permintaan pemilik, 1 Okt 2026.)
 
 ### Laporan penjualan
 
@@ -213,17 +213,23 @@ Pesanan batal tidak dihitung. Omzet dari tagihan lunas, dihitung di tanggal baya
 
 ## Fase 4 — Pengaturan toko
 
-| Isian | Nilai awal |
-| --- | --- |
-| Nama toko | Tetuti Kitchen |
-| Tagline | 100% Homemade. Pedas nampol, renyahnya bikin nagih. |
-| Kota | Jakarta |
-| WhatsApp | 081284966859 |
-| Jam | Pre-order via WhatsApp |
-| Area | Siap antar / pickup |
+Halaman Pengaturan (`#/pengaturan`, di menu ☰) untuk semua admin, termasuk staf. Data di migrasi `20261013000000_pengaturan_toko.sql`. (Keputusan pemilik, 13 Okt 2026.)
 
-- Info toko: ubah isian di atas. Nomor disimpan sebagai `62…`, tampil sebagai `08…`.
-- Info pembayaran: transfer (bank, rekening, atas nama), QRIS (satu gambar), tunai (catatan). Minimal satu aktif. Menjadi pilihan saat buat tagihan.
+| Isian | Nilai awal | Dipakai di |
+| --- | --- | --- |
+| Nama toko | Tetuti Kitchen | Situs (footer, form pesanan, pesan WhatsApp), invoice, pesan tagihan |
+| Teks kecil di atas judul | 100% Homemade | Hero situs (opsional; kosong berarti disembunyikan) |
+| Judul besar di situs | Pedas nampol, renyahnya bikin nagih | Hero situs |
+| Kota | Jakarta | Info toko untuk Google (data terstruktur) |
+| WhatsApp | 081284966859 | Tombol Chat WA, pesan lewat WhatsApp, kop invoice |
+
+- Info toko: nomor disimpan sebagai `62…`, tampil sebagai `08…`. Jam dan Area tidak dipakai lagi dan dihapus.
+- Situs membaca info toko dari tabel `store_settings` saat dibuka. Nilai di `js/config.js` hanya cadangan kalau Supabase tidak terjangkau, jadi kalau nomor WhatsApp diganti, sebaiknya `js/config.js` ikut diganti. Judul halaman, deskripsi, dan tag pratinjau tautan (`<title>`, `og:*`) tetap di `index.html` karena Google dan WhatsApp tidak menjalankan JavaScript.
+- Rekening transfer: bank, nomor (angka saja), atas nama. Bisa lebih dari satu; tambah dan hapus. Rekening BRI yang lama menjadi rekening pertama.
+- QRIS: satu gambar (PNG atau JPG dari HP, disimpan sebagai PNG di bucket privat `toko`). Dicetak di halaman invoice dan PDF untuk tagihan QRIS yang belum lunas, supaya pembeli bisa langsung scan.
+- Tunai: nyala/mati dan catatan opsional.
+- Minimal satu cara bayar aktif. Menghapus rekening terakhir, menghapus QRIS, atau mematikan tunai ditolak kalau tidak ada cara bayar lain.
+- Info pembayaran tidak tampil di situs. Pengunjung hanya bisa membaca nama toko, teks hero, kota, dan WhatsApp; rekening, QRIS, dan catatan tunai hanya terbaca admin. Pembeli melihatnya di tagihan yang dikirim kepadanya.
 
 ## Data yang disimpan
 
@@ -232,13 +238,14 @@ Backend: Supabase (Postgres, Auth, Realtime, Storage) di region Singapore. Skema
 - Akun: Supabase Auth. Tabel `admins` menandai akun admin.
 - Menu: identitas, nama, kategori, harga, satuan, aktif, urutan, badge, kalimat singkat, deskripsi, sorotan, foto. Foto hanya boleh dari folder `assets/` situs atau bucket `menu-foto` proyek ini.
 - Pesanan: kode, sumber (situs/admin), pembeli, antar/pickup, alamat, catatan, item dengan harga saat dipesan, ongkir, status, alasan batal, waktu dibuat, waktu status terakhir, waktu pertama dibuka admin.
-- Tagihan (fase 2), toko (fase 4).
+- Tagihan (fase 2).
+- Toko (fase 4): satu baris `store_settings` (nama, teks hero, kota, WhatsApp, gambar QRIS, tunai) dan tabel `bank_accounts`.
 
 Kode pesanan `TK-DDMMYYYY-NN`: tanggal Jakarta plus urutan harian, sama untuk pesanan situs dan manual.
 
 Hak akses:
 
-- Pengunjung tanpa login: hanya membaca isi kartu menu aktif (nama, harga, teks, foto), dan mengirim pesanan lewat satu fungsi database yang memeriksa semua aturan di atas. Tidak bisa membaca atau mengubah tabel lain, dan tidak bisa mengunggah, menghapus, atau melihat daftar foto.
+- Pengunjung tanpa login: hanya membaca isi kartu menu aktif (nama, harga, teks, foto) dan info toko (nama, teks hero, kota, WhatsApp), dan mengirim pesanan lewat satu fungsi database yang memeriksa semua aturan di atas. Tidak bisa membaca atau mengubah tabel lain, dan tidak bisa mengunggah, menghapus, atau melihat daftar foto.
 - Admin: membaca dan mengubah semuanya lewat aturan RLS.
 
 ## Ukuran berhasil
@@ -322,3 +329,9 @@ Fase 3, langkah 2 — laporan (keputusan pemilik, 1 Okt 2026): omzet dihitung di
 - [x] Agen: halaman Laporan dan fungsi `sales_report()` (migrasi `20261001010000_laporan.sql`).
 - [x] Agen: dashboard laporan dengan rentang waktu, grafik, daftar pesanan, dan ekspor CSV (migrasi `20261002000000_laporan_rentang.sql`, menggantikan fungsi laporan sebelumnya).
 - [ ] Pemilik: jalankan migrasi laporan rentang, push, lalu cocokkan angka Laporan dengan pesanan dan tagihan yang ada, dan buka file CSV di Excel.
+
+Fase 4 — pengaturan toko (keputusan pemilik, 13 Okt 2026):
+
+- [x] Agen: halaman Pengaturan (info toko, rekening, QRIS, tunai), pilihan rekening di form tagihan, QRIS di invoice dan PDF, situs membaca info toko dari database (migrasi `20261013000000_pengaturan_toko.sql`).
+- [ ] Pemilik: jalankan migrasi pengaturan toko **sebelum** push, lalu push.
+- [ ] Pemilik: unggah gambar QRIS, buat tagihan QRIS uji dan kirim PDF-nya, lalu scan dari HP lain. Ubah judul hero dan pastikan situs ikut berubah.

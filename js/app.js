@@ -25,20 +25,49 @@ function priceLabel(id) {
 }
 
 const MENU_COLUMNS = "id,name,category,badge,hook,description,highlights,image_url,price,unit";
+const STORE_COLUMNS = "store_name,hero_kicker,hero_title,city,whatsapp_number";
 
-// Kalau Supabase lambat atau gagal, kartu dari js/products.js tetap tampil
-// dengan tulisan "Harga via WhatsApp".
-async function loadMenu() {
+// Hasilnya null kalau Supabase menolak; lewat 5 detik dianggap gagal.
+async function restGet(path) {
   const { supabaseUrl, supabaseKey } = window.TETUTI;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/menu_items?select=${MENU_COLUMNS}&order=sort_order,name`,
-      { headers: { apikey: supabaseKey }, signal: controller.signal }
-    );
-    if (!response.ok) return;
-    const rows = await response.json();
+    const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+      headers: { apikey: supabaseKey },
+      signal: controller.signal,
+    });
+    return response.ok ? await response.json() : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Kalau gagal, isian js/config.js tetap dipakai.
+async function loadStore() {
+  try {
+    const [row] = (await restGet(`store_settings?select=${STORE_COLUMNS}`)) ?? [];
+    if (!row) return;
+    Object.assign(window.TETUTI, {
+      storeName: row.store_name,
+      heroKicker: row.hero_kicker,
+      heroTitle: row.hero_title,
+      city: row.city,
+      whatsappNumber: row.whatsapp_number,
+    });
+    hydrateBrand();
+    injectStructuredData();
+  } catch {
+    // Tetap dengan isian bawaan.
+  }
+}
+
+// Kalau Supabase lambat atau gagal, kartu dari js/products.js tetap tampil
+// dengan tulisan "Harga via WhatsApp".
+async function loadMenu() {
+  try {
+    const rows = await restGet(`menu_items?select=${MENU_COLUMNS}&order=sort_order,name`);
+    if (!rows) return;
     products = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -59,7 +88,6 @@ async function loadMenu() {
   } catch {
     // Tetap dengan kartu bawaan.
   } finally {
-    clearTimeout(timer);
     document.querySelectorAll("[data-price].is-loading").forEach((el) => {
       el.textContent = priceLabel(el.dataset.price);
       el.classList.remove("is-loading");
@@ -352,18 +380,16 @@ function bindOrderSheet() {
 }
 
 function hydrateBrand() {
-  const { storeName, tagline, hours, area, whatsappNumber } = window.TETUTI;
+  const { storeName, heroKicker, heroTitle, whatsappNumber } = window.TETUTI;
   document.querySelectorAll("[data-store]").forEach((el) => {
     el.textContent = storeName;
   });
-  document.querySelectorAll("[data-tagline]").forEach((el) => {
-    el.textContent = tagline;
+  document.querySelectorAll("[data-hero-kicker]").forEach((el) => {
+    el.textContent = heroKicker ?? "";
+    el.hidden = !heroKicker;
   });
-  document.querySelectorAll("[data-hours]").forEach((el) => {
-    el.textContent = hours;
-  });
-  document.querySelectorAll("[data-area]").forEach((el) => {
-    el.textContent = area;
+  document.querySelectorAll("[data-hero-title]").forEach((el) => {
+    el.textContent = heroTitle;
   });
 
   const chat = waLink(`Halo ${storeName}, saya mau tanya menu dan ketersediaan.`);
@@ -379,9 +405,13 @@ function hydrateBrand() {
 // Data terstruktur untuk Google, dibangun dari config + daftar produk supaya
 // tidak perlu diperbarui manual setiap ada produk baru.
 function injectStructuredData() {
-  const { siteUrl, storeName, tagline, city, whatsappNumber } = window.TETUTI;
+  const { siteUrl, storeName, heroKicker, heroTitle, city, whatsappNumber } = window.TETUTI;
   const absolute = (path) => (/^https?:/.test(path) ? path : `${siteUrl}/${path.replace(/^\//, "")}`);
   const phone = whatsappNumber.replace(/\D/g, "");
+  const description = [heroKicker, heroTitle]
+    .filter(Boolean)
+    .map((text) => (/[.!?]$/.test(text) ? text : `${text}.`))
+    .join(" ");
 
   const data = {
     "@context": "https://schema.org",
@@ -390,7 +420,7 @@ function injectStructuredData() {
         "@type": "FoodEstablishment",
         "@id": `${siteUrl}/#business`,
         name: storeName,
-        description: tagline,
+        description,
         url: `${siteUrl}/`,
         image: absolute("assets/og-image.jpg"),
         logo: absolute("assets/logo-cabai.png"),
@@ -515,6 +545,7 @@ hydrateBrand();
 injectStructuredData();
 syncNavHeight();
 renderProducts();
+loadStore();
 loadMenu();
 bindGrid();
 bindOrderSheet();

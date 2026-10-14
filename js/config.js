@@ -1,12 +1,13 @@
 window.TETUTI = {
   siteUrl: "https://www.tetuti.my.id",
+  // Info toko diatur di admin (Pengaturan). Nilai di bawah hanya dipakai
+  // sebelum isian dari database termuat atau kalau Supabase tidak terjangkau.
   storeName: "Tetuti Kitchen",
-  tagline: "100% Homemade. Pedas nampol, renyahnya bikin nagih.",
+  heroKicker: "100% Homemade",
+  heroTitle: "Pedas nampol, renyahnya bikin nagih",
   city: "Jakarta",
-  // Ganti dengan nomor WhatsApp aktif, format 62... tanpa + atau spasi
+  // Format 62... tanpa + atau spasi
   whatsappNumber: "6281284966859",
-  hours: "Pre-order via WhatsApp",
-  area: "Siap antar / pickup",
   // Kunci publishable memang untuk browser. Jangan taruh kunci secret di sini.
   supabaseUrl: "https://vmqrwjzjxetjbrqfhnhr.supabase.co",
   supabaseKey: "sb_publishable_lqsweWdUnLQYNcyPyYhmjw_ZJzDCNoR",

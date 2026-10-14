@@ -265,13 +265,18 @@ export function invoiceLines(items) {
   return items.map((item) => ({ name: item.name, quantity: item.quantity, unit_price: item.unit_price }));
 }
 
-export function invoiceMessage(invoice, order) {
+// Teks rekening yang disalin ke tagihan, misalnya "BRI 4407… a.n. Sugiastuti".
+export function bankAccountText(account) {
+  return `${account.bank} ${account.account_number} a.n. ${account.holder}`;
+}
+
+export function invoiceMessage(invoice, order, storeName) {
   const lines = invoice.lines.map(
     (line) =>
       `${line.quantity}× ${line.name} @ ${formatRp(line.unit_price)} = ${formatRp(line.quantity * line.unit_price)}`
   );
   return [
-    `Halo Kak ${order.customer_name}, berikut tagihan pesanan Tetuti Kitchen.`,
+    `Halo Kak ${order.customer_name}, berikut tagihan pesanan ${storeName}.`,
     "",
     `Tagihan: ${invoice.code}`,
     `Pesanan: ${order.code}`,
@@ -293,16 +298,16 @@ export function invoiceMessage(invoice, order) {
 export const INVOICE_STAMP = { draft: "Belum dibayar", terkirim: "Belum dibayar", lunas: "Lunas", batal: "Dibatalkan" };
 
 // Keterangan singkat yang ikut terkirim bersama file PDF.
-export function invoiceCaption(invoice, order) {
+export function invoiceCaption(invoice, order, storeName) {
   const what = invoice.status === "lunas" ? `invoice lunas ${invoice.code}` : `invoice ${invoice.code}`;
-  return `Halo Kak ${order.customer_name}, berikut ${what} untuk pesanan ${order.code} di Tetuti Kitchen. Total ${formatRp(invoice.total)}.`;
+  return `Halo Kak ${order.customer_name}, berikut ${what} untuk pesanan ${order.code} di ${storeName}. Total ${formatRp(invoice.total)}.`;
 }
 
-export function invoiceLinkMessage(invoice, order, url) {
+export function invoiceLinkMessage(invoice, order, url, storeName) {
   let closing = "Setelah membayar, mohon kirim bukti pembayaran di chat ini. Terima kasih!";
   if (invoice.status === "lunas") closing = "Pembayaran sudah kami terima. Terima kasih!";
   else if (invoice.method === "tunai") closing = "Terima kasih!";
-  return [invoiceCaption(invoice, order), "", "Invoice (PDF):", url, "", closing].join("\n");
+  return [invoiceCaption(invoice, order, storeName), "", "Invoice (PDF):", url, "", closing].join("\n");
 }
 
 const PDF_REPLACEMENTS = { "‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-", "…": "...", "\u202f": " " };

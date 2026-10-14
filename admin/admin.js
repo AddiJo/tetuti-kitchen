@@ -1,6 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config.js";
 import {
+  bankAccountText,
   currentPasswordErrorMessage,
   displayPhone,
   errorMessage,
@@ -104,6 +105,9 @@ const state = {
   unseen: 0,
   knownIds: null,
   menu: [],
+  // Pengaturan toko dan rekening; null kalau gagal dimuat.
+  settings: null,
+  banks: [],
   filter: "semua",
   search: "",
   flash: null,
@@ -209,10 +213,37 @@ async function loadMenu() {
   return error;
 }
 
+async function loadSettings() {
+  const [settings, banks] = await Promise.all([
+    supabase.from("store_settings").select("*").maybeSingle(),
+    supabase.from("bank_accounts").select("*").order("created_at").order("id"),
+  ]);
+  const error = settings.error || banks.error || (settings.data ? null : { message: "Pengaturan toko kosong." });
+  state.settings = error ? null : settings.data;
+  state.banks = error ? [] : banks.data;
+  return error;
+}
+
+function settingsProblem(error) {
+  return error.code === "PGRST205" || error.code === "42P01"
+    ? "Migration pengaturan toko belum dijalankan di Supabase."
+    : `Pengaturan toko gagal dimuat. ${errorMessage(error)}`;
+}
+
+// Kalau pengaturan gagal dimuat, nama dan nomor dari js/config.js yang dipakai.
+function storeInfo() {
+  const config = window.TETUTI ?? {};
+  return {
+    siteUrl: config.siteUrl,
+    storeName: state.settings?.store_name ?? config.storeName ?? "Tetuti Kitchen",
+    whatsappNumber: state.settings?.whatsapp_number ?? config.whatsappNumber,
+  };
+}
+
 async function enterAdmin() {
   state.signedIn = true;
   topbar.hidden = false;
-  await loadMenu();
+  await Promise.all([loadMenu(), loadSettings()]);
   route();
   startWatching();
   cleanupExpiredPdfs();
@@ -552,6 +583,7 @@ async function renderDetail(id) {
   const [{ data: order, error }, { data: invoices, error: invoiceError }] = await Promise.all([
     fetchOrder(id),
     fetchInvoices(id),
+    loadSettings(),
   ]);
   if (seq !== renderSeq) return;
   if (error) return renderProblem(errorMessage(error));
@@ -745,12 +777,58 @@ cancelDialog.querySelector("form").addEventListener("submit", async (event) => {
 
 const INVOICE_ELIGIBLE = ["dikonfirmasi", "diproses", "selesai"];
 const PDF_LABEL = { draft: "Kirim PDF ke WhatsApp", terkirim: "Kirim ulang PDF", lunas: "Kirim PDF lunas" };
-const DEFAULT_INSTRUCTIONS = { transfer: "BRI 440701021532539 a.n. Sugiastuti" };
 const INSTRUCTION_HINT = {
-  transfer: DEFAULT_INSTRUCTIONS.transfer,
+  transfer: "Contoh: BCA 1234567890 a.n. Nama Pemilik",
   qris: "Kode QRIS kami kirim di chat ini.",
   tunai: "Dibayar saat pickup atau saat diantar.",
 };
+const QRIS_INSTRUCTION = "Scan kode QRIS di invoice ini.";
+const QRIS_BUCKET = "toko";
+
+// Cara bayar yang bisa dipilih saat membuat tagihan. Kalau pengaturan gagal
+// dimuat, semuanya tetap bisa dipilih dengan instruksi diketik sendiri.
+function paymentMethods() {
+  const settings = state.settings;
+  return Object.keys(METHOD_LABEL).filter((method) => {
+    if (!settings) return true;
+    if (method === "transfer") return state.banks.length > 0;
+    if (method === "qris") return Boolean(settings.qris_path);
+    return settings.tunai_enabled;
+  });
+}
+
+// Gambar QRIS hanya dicetak selama tagihan belum dibayar.
+function invoiceQrisPath(invoice) {
+  if (invoice.method !== "qris" || !["draft", "terkirim"].includes(invoice.status)) return null;
+  return state.settings?.qris_path ?? null;
+}
+
+const qrisCache = new Map();
+
+// Bucket QRIS privat, jadi gambarnya diambil dengan sesi admin.
+function qrisBlob(path) {
+  if (!qrisCache.has(path)) {
+    const blob = supabase.storage
+      .from(QRIS_BUCKET)
+      .download(path)
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return data;
+      });
+    blob.catch(() => qrisCache.delete(path));
+    qrisCache.set(path, blob);
+  }
+  return qrisCache.get(path);
+}
+
+function blobDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
 
 function fetchInvoices(orderId) {
   return supabase
@@ -877,10 +955,14 @@ const pdfCache = new Map();
 // PDF disiapkan begitu halaman tampil. Safari hanya mengizinkan menu Bagikan
 // sesaat setelah tombol diketuk, jadi file harus sudah jadi saat itu.
 function invoicePdf(invoice, order) {
-  const key = `${invoice.id}:${invoice.updated_at}`;
+  const qrisPath = invoiceQrisPath(invoice);
+  const key = `${invoice.id}:${invoice.updated_at}:${state.settings?.updated_at}:${qrisPath}`;
   if (!pdfCache.has(key)) {
-    const store = window.TETUTI ?? { storeName: "Tetuti Kitchen" };
-    const file = invoicePdfFile(invoice, order, store).catch((error) => {
+    const store = storeInfo();
+    const file = (async () => {
+      const qris = qrisPath ? await blobDataUrl(await qrisBlob(qrisPath)) : null;
+      return invoicePdfFile(invoice, order, store, qris);
+    })().catch((error) => {
       pdfCache.delete(key);
       throw error;
     });
@@ -939,7 +1021,10 @@ async function sendInvoiceLink(invoice, order, button, errorEl) {
     return false;
   }
 
-  const url = waLink(order.customer_phone, invoiceLinkMessage(invoice, order, pdfLink(path)));
+  const url = waLink(
+    order.customer_phone,
+    invoiceLinkMessage(invoice, order, pdfLink(path), storeInfo().storeName)
+  );
   if (chat) chat.location.href = url;
   else location.href = url;
   toast(invoice.status === "draft" ? "Invoice dikirim, tagihan ditandai terkirim" : "Invoice dikirim");
@@ -997,7 +1082,7 @@ async function cleanupExpiredPdfs() {
 // Hasil true berarti status tagihan berubah dan halaman perlu dimuat ulang.
 async function shareInvoicePdf(invoice, order, button, errorEl) {
   button.disabled = true;
-  const caption = invoiceCaption(invoice, order);
+  const caption = invoiceCaption(invoice, order, storeInfo().storeName);
   let shared;
   try {
     const file = await invoicePdf(invoice, order);
@@ -1134,6 +1219,7 @@ async function renderInvoiceForm(orderId) {
   const [{ data: order, error }, { data: invoices, error: invoiceError }] = await Promise.all([
     fetchOrder(orderId),
     fetchInvoices(orderId),
+    loadSettings(),
   ]);
   if (seq !== renderSeq) return;
   if (error || invoiceError) return renderProblem(errorMessage(error || invoiceError), back);
@@ -1154,13 +1240,32 @@ async function renderInvoiceForm(orderId) {
     return renderProblem("Isi harga semua item dulu, baru tagihan bisa dibuat.", back);
   }
 
+  // Cara bayar draft lama tetap bisa dipilih walau sudah dimatikan di pengaturan.
+  const available = paymentMethods();
+  const methods = Object.keys(METHOD_LABEL).filter(
+    (method) => available.includes(method) || method === active?.method
+  );
+  if (methods.length === 0) {
+    return renderProblem(
+      "Belum ada cara bayar yang aktif. Tambahkan rekening, gambar QRIS, atau nyalakan tunai di menu Pengaturan.",
+      back
+    );
+  }
+  const banks = state.banks.map(bankAccountText);
+  let bankSelect = null;
+  const defaultFor = (method) => {
+    if (method === "transfer") return (bankSelect ? banks[Number(bankSelect.value)] : banks[0]) ?? "";
+    if (method === "qris") return state.settings?.qris_path ? QRIS_INSTRUCTION : "";
+    return state.settings?.tunai_note ?? "";
+  };
+
   const draft = active ?? {
     code: "INV-…",
     lines: invoiceLines(order.order_items),
     shipping_fee: order.shipping_fee,
     total,
-    method: "transfer",
-    instructions: DEFAULT_INSTRUCTIONS.transfer,
+    method: methods[0],
+    instructions: defaultFor(methods[0]),
   };
 
   app.innerHTML = `
@@ -1173,13 +1278,23 @@ async function renderInvoiceForm(orderId) {
       <form id="invoice-form" class="stack" novalidate>
         <fieldset class="seg">
           <legend class="sr-only">Cara bayar</legend>
-          ${Object.entries(METHOD_LABEL)
+          ${methods
             .map(
-              ([value, label]) =>
-                `<label><input type="radio" name="method" value="${value}" /> <span>${label}</span></label>`
+              (value) =>
+                `<label><input type="radio" name="method" value="${value}" /> <span>${METHOD_LABEL[value]}</span></label>`
             )
             .join("")}
         </fieldset>
+        ${
+          banks.length
+            ? `<label class="field" data-bank-field>
+                <span>Rekening tujuan</span>
+                <select class="input" name="bank">
+                  ${banks.map((text, index) => `<option value="${index}">${esc(text)}</option>`).join("")}
+                </select>
+              </label>`
+            : ""
+        }
         <label class="field">
           <span data-instructions-label>Instruksi bayar</span>
           <textarea class="input" name="instructions" rows="3" maxlength="500"></textarea>
@@ -1201,29 +1316,42 @@ async function renderInvoiceForm(orderId) {
   const errorEl = form.querySelector("[data-error]");
   const previewEl = form.querySelector("[data-preview]");
   const labelEl = form.querySelector("[data-instructions-label]");
-  fields.method.value = draft.method;
+  const bankField = form.querySelector("[data-bank-field]");
+  bankSelect = fields.bank ?? null;
+  // Dengan satu pilihan saja, form.elements.method berisi satu radio, bukan daftar.
+  const radios = form.querySelectorAll('[name="method"]');
+  const checkedMethod = () => form.querySelector('[name="method"]:checked')?.value ?? methods[0];
+  radios.forEach((radio) => {
+    radio.checked = radio.value === draft.method;
+  });
+  if (bankSelect) bankSelect.value = String(Math.max(0, banks.indexOf(draft.instructions)));
   fields.instructions.value = draft.instructions ?? "";
 
   const read = () => ({
-    method: fields.method.value,
+    method: checkedMethod(),
     instructions: fields.instructions.value.trim() || null,
   });
   const sync = () => {
     const { method, instructions } = read();
+    if (bankField) bankField.hidden = method !== "transfer";
     fields.instructions.placeholder = INSTRUCTION_HINT[method];
     labelEl.textContent = method === "tunai" ? "Instruksi bayar (opsional)" : "Instruksi bayar";
-    previewEl.textContent = invoiceMessage({ ...draft, method, instructions }, order);
+    previewEl.textContent = invoiceMessage({ ...draft, method, instructions }, order, storeInfo().storeName);
   };
-  // Rekening bawaan ikut diganti saat cara bayar diganti, kecuali admin sudah
-  // menulis instruksinya sendiri.
+  // Instruksi bawaan ikut diganti saat cara bayar diganti, kecuali admin sudah
+  // menulis instruksinya sendiri. Memilih rekening selalu mengganti isinya.
   let lastMethod = draft.method;
-  fields.method.forEach((radio) =>
+  radios.forEach((radio) =>
     radio.addEventListener("change", () => {
-      const untouched = fields.instructions.value.trim() === (DEFAULT_INSTRUCTIONS[lastMethod] ?? "");
-      if (untouched) fields.instructions.value = DEFAULT_INSTRUCTIONS[radio.value] ?? "";
+      if (fields.instructions.value.trim() === defaultFor(lastMethod)) {
+        fields.instructions.value = defaultFor(radio.value);
+      }
       lastMethod = radio.value;
     })
   );
+  bankSelect?.addEventListener("change", () => {
+    fields.instructions.value = defaultFor("transfer");
+  });
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
   sync();
@@ -1236,7 +1364,7 @@ async function renderInvoiceForm(orderId) {
       return showError(
         errorEl,
         values.method === "transfer"
-          ? `Isi rekening tujuan, misalnya ${DEFAULT_INSTRUCTIONS.transfer}.`
+          ? "Isi rekening tujuan: nama bank, nomor rekening, dan atas nama."
           : "Isi instruksi bayar, misalnya bahwa kode QRIS dikirim di chat."
       );
     }
@@ -1257,17 +1385,17 @@ async function renderInvoiceForm(orderId) {
 async function renderInvoiceDoc(id) {
   const seq = ++renderSeq;
   app.innerHTML = `<p class="page muted">Memuat…</p>`;
-  const { data: invoice, error } = await supabase
-    .from("invoices")
-    .select(INVOICE_WITH_ORDER)
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: invoice, error }] = await Promise.all([
+    supabase.from("invoices").select(INVOICE_WITH_ORDER).eq("id", id).maybeSingle(),
+    loadSettings(),
+  ]);
   if (seq !== renderSeq) return;
   if (error) return renderProblem(errorMessage(error));
   if (!invoice) return renderProblem("Tagihan tidak ditemukan.");
 
   const order = invoice.orders;
-  const store = window.TETUTI ?? { storeName: "Tetuti Kitchen" };
+  const store = storeInfo();
+  const qrisPath = invoiceQrisPath(invoice);
   state.printTitle = `${invoice.code} ${store.storeName}`;
 
   const contact = [
@@ -1365,6 +1493,7 @@ async function renderInvoiceDoc(id) {
           <span class="label">Cara bayar</span>
           <strong>${esc(METHOD_LABEL[invoice.method])}</strong>
           ${invoice.instructions ? `<p class="note">${esc(invoice.instructions)}</p>` : ""}
+          ${qrisPath ? `<img class="doc-qris" data-qris alt="Kode QRIS" hidden />` : ""}
         </div>
         ${paid}
         <p class="doc-foot">Terima kasih sudah memesan di ${esc(store.storeName)}.</p>
@@ -1373,6 +1502,18 @@ async function renderInvoiceDoc(id) {
 
   const errorEl = app.querySelector("[data-error]");
   app.querySelector("[data-print]").addEventListener("click", () => window.print());
+  const qrisImg = app.querySelector("[data-qris]");
+  if (qrisImg) {
+    qrisBlob(qrisPath)
+      .then(blobDataUrl)
+      .then((src) => {
+        qrisImg.src = src;
+        qrisImg.hidden = false;
+      })
+      .catch((problem) => {
+        if (seq === renderSeq) showError(errorEl, `Gambar QRIS gagal dimuat. ${errorMessage(problem)}`);
+      });
+  }
   const pdfButton = app.querySelector("[data-invoice-pdf]");
   const shareButton = app.querySelector("[data-invoice-share]");
   if (pdfButton) {
@@ -2066,6 +2207,348 @@ async function renderMenuForm(id) {
   });
 }
 
+// Pengaturan toko --------------------------------------------------------------
+
+// Gambar ini ikut masuk ke PDF invoice yang dibatasi 1 MB, jadi dibatasi lebih kecil.
+const QRIS_MAX_BYTES = 700 * 1024;
+
+// QRIS disimpan sebagai PNG supaya kotak-kotak kodenya tetap tajam saat dicetak.
+async function prepareQris(file) {
+  if (!/^image\/(jpeg|png)$/.test(file.type)) throw new Error("Pilih gambar berformat PNG atau JPG.");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode().catch(() => {
+      throw new Error("Gambar tidak bisa dibaca. Coba gambar lain.");
+    });
+    for (const maxPx of [1000, 800, 600]) {
+      const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob && blob.size <= QRIS_MAX_BYTES) return blob;
+    }
+    throw new Error("Gambar QRIS terlalu besar. Potong gambarnya di sekitar kode QR, lalu coba lagi.");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Minimal satu cara bayar harus tetap aktif supaya tagihan bisa dibuat.
+function leavesNoMethod({
+  banks = state.banks.length,
+  qris = state.settings.qris_path,
+  tunai = state.settings.tunai_enabled,
+}) {
+  return banks === 0 && !qris && !tunai;
+}
+const LAST_METHOD_MESSAGE = "Minimal satu cara bayar harus aktif: rekening transfer, QRIS, atau tunai.";
+
+async function updateSettings(values) {
+  const { data, error } = await supabase.from("store_settings").update(values).eq("id", true).select("id");
+  if (error) return errorMessage(error);
+  if (data.length === 0) return "Pengaturan tidak tersimpan. Muat ulang lalu coba lagi.";
+  return null;
+}
+
+function bankRowHtml(account) {
+  return `
+    <div class="admin-row">
+      <span class="admin-who">
+        <strong>${esc(account.bank)} ${esc(account.account_number)}</strong>
+        <span class="small muted">a.n. ${esc(account.holder)}</span>
+      </span>
+      <button class="btn ghost" type="button" data-bank-remove="${esc(account.id)}">Hapus</button>
+    </div>`;
+}
+
+async function renderSettings() {
+  const seq = ++renderSeq;
+  app.innerHTML = `<p class="page muted">Memuat…</p>`;
+  const loadError = await loadSettings();
+  if (seq !== renderSeq) return;
+  if (loadError) return renderProblem(settingsProblem(loadError));
+  const settings = state.settings;
+  const banks = state.banks;
+
+  app.innerHTML = `
+    <section class="page">
+      <h1>Pengaturan toko</h1>
+      ${
+        paymentMethods().length === 0
+          ? `<p class="notice error">Belum ada cara bayar yang aktif, jadi tagihan belum bisa dibuat.</p>`
+          : ""
+      }
+      <form id="store-form" class="card stack" novalidate>
+        <h2>Info toko</h2>
+        <label class="field">
+          <span>Nama toko</span>
+          <input class="input" name="store_name" maxlength="60" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Teks kecil di atas judul (opsional)</span>
+          <input class="input" name="hero_kicker" maxlength="40" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Judul besar di situs</span>
+          <input class="input" name="hero_title" maxlength="80" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Kota</span>
+          <input class="input" name="city" maxlength="40" autocomplete="off" />
+          <span class="small muted">Dipakai sebagai daerah layanan di info toko untuk Google.</span>
+        </label>
+        <label class="field">
+          <span>Nomor WhatsApp toko</span>
+          <input class="input" name="whatsapp" inputmode="tel" autocomplete="off" />
+          <span class="small muted">Tombol Chat WA dan pesanan lewat WhatsApp di situs menuju nomor ini.</span>
+        </label>
+        <p class="small muted">Tampil di situs dan invoice. Judul halaman di Google dan pratinjau tautan di WhatsApp tidak ikut berubah.</p>
+        <p class="error" data-error hidden></p>
+        <button class="btn primary full" type="submit">Simpan info toko</button>
+      </form>
+
+      <div class="card stack">
+        <h2>Rekening transfer</h2>
+        <p class="small muted">Dipilih saat membuat tagihan transfer. Rekening paling atas terpilih otomatis.</p>
+        ${
+          banks.length
+            ? `<div class="admin-list">${banks.map(bankRowHtml).join("")}</div>`
+            : `<p class="small muted">Belum ada rekening.</p>`
+        }
+        <p class="error" data-banks-error hidden></p>
+        <form id="bank-form" class="stack" novalidate>
+          <span class="label">Tambah rekening</span>
+          <label class="field">
+            <span>Bank</span>
+            <input class="input" name="bank" maxlength="30" autocomplete="off" placeholder="Contoh: BCA" />
+          </label>
+          <label class="field">
+            <span>Nomor rekening</span>
+            <input class="input" name="account_number" inputmode="numeric" maxlength="30" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Atas nama</span>
+            <input class="input" name="holder" maxlength="60" autocomplete="off" />
+          </label>
+          <p class="error" data-error hidden></p>
+          <button class="btn full" type="submit">Tambah rekening</button>
+        </form>
+      </div>
+
+      <div class="card stack">
+        <h2>QRIS</h2>
+        <p class="small muted">Dicetak di invoice tagihan QRIS yang belum lunas, supaya pembeli bisa langsung scan.</p>
+        <div class="photo-field">
+          <div class="photo-frame qris-frame">
+            <img data-qris-preview alt="Kode QRIS" hidden />
+            <span class="muted small" data-qris-empty>${settings.qris_path ? "Memuat…" : "Belum ada QRIS"}</span>
+          </div>
+          <div class="stack">
+            <label class="btn photo-btn">
+              <input class="sr-only" type="file" accept="image/png,image/jpeg" data-qris-file />
+              <span data-qris-label>${settings.qris_path ? "Ganti gambar" : "Pilih gambar"}</span>
+            </label>
+            ${settings.qris_path ? `<button class="btn ghost" type="button" data-qris-remove>Hapus QRIS</button>` : ""}
+            <span class="small muted">PNG atau JPG, misalnya tangkapan layar QRIS dari aplikasi bank.</span>
+          </div>
+        </div>
+        <p class="error" data-qris-error hidden></p>
+      </div>
+
+      <form id="cash-form" class="card stack" novalidate>
+        <h2>Tunai</h2>
+        <label class="check">
+          <input type="checkbox" name="tunai_enabled" />
+          <span>Terima pembayaran tunai</span>
+        </label>
+        <label class="field">
+          <span>Catatan tunai (opsional)</span>
+          <input class="input" name="tunai_note" maxlength="200" autocomplete="off" />
+          <span class="small muted">Terisi otomatis di tagihan tunai.</span>
+        </label>
+        <p class="error" data-error hidden></p>
+        <button class="btn primary full" type="submit">Simpan</button>
+      </form>
+    </section>`;
+
+  const busy = (button, text) => {
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = text;
+    return () => {
+      button.disabled = false;
+      button.textContent = label;
+    };
+  };
+  const done = (text) => {
+    toast(text);
+    if (seq === renderSeq) renderSettings();
+  };
+
+  const storeForm = app.querySelector("#store-form");
+  const storeFields = storeForm.elements;
+  storeFields.store_name.value = settings.store_name;
+  storeFields.hero_kicker.value = settings.hero_kicker ?? "";
+  storeFields.hero_title.value = settings.hero_title;
+  storeFields.city.value = settings.city;
+  storeFields.whatsapp.value = displayPhone(settings.whatsapp_number);
+  storeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const errorEl = storeForm.querySelector("[data-error]");
+    errorEl.hidden = true;
+    const text = (name) => storeFields[name].value.replace(/\s+/g, " ").trim();
+    const values = {
+      store_name: text("store_name"),
+      hero_kicker: text("hero_kicker") || null,
+      hero_title: text("hero_title"),
+      city: text("city"),
+      whatsapp_number: normalizePhone(storeFields.whatsapp.value),
+    };
+    if (!values.store_name) return showError(errorEl, "Nama toko wajib diisi.");
+    if (!values.hero_title) return showError(errorEl, "Judul besar di situs wajib diisi.");
+    if (!values.city) return showError(errorEl, "Kota wajib diisi.");
+    if (!isValidPhone(values.whatsapp_number)) {
+      return showError(errorEl, "Nomor WhatsApp tidak valid. Contoh: 0812 3456 7890.");
+    }
+    const restore = busy(event.submitter, "Menyimpan…");
+    const problem = await updateSettings(values);
+    restore();
+    if (problem) return showError(errorEl, problem);
+    done("Info toko disimpan");
+  });
+
+  const banksError = app.querySelector("[data-banks-error]");
+  app.querySelectorAll("[data-bank-remove]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      banksError.hidden = true;
+      const account = banks.find((entry) => entry.id === button.dataset.bankRemove);
+      if (leavesNoMethod({ banks: banks.length - 1 })) return showError(banksError, LAST_METHOD_MESSAGE);
+      if (!window.confirm(`Hapus rekening ${bankAccountText(account)}? Tagihan yang sudah dibuat tidak berubah.`)) {
+        return;
+      }
+      const restore = busy(button, "Menghapus…");
+      const { data, error } = await supabase.from("bank_accounts").delete().eq("id", account.id).select("id");
+      restore();
+      if (error || data.length === 0) {
+        return showError(banksError, error ? errorMessage(error) : "Rekening tidak terhapus. Muat ulang lalu coba lagi.");
+      }
+      done("Rekening dihapus");
+    })
+  );
+
+  const bankForm = app.querySelector("#bank-form");
+  bankForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = bankForm.elements;
+    const errorEl = bankForm.querySelector("[data-error]");
+    errorEl.hidden = true;
+    const values = {
+      bank: fields.bank.value.replace(/\s+/g, " ").trim(),
+      account_number: fields.account_number.value.replace(/[\s.-]/g, ""),
+      holder: fields.holder.value.replace(/\s+/g, " ").trim(),
+    };
+    if (!values.bank) return showError(errorEl, "Nama bank wajib diisi.");
+    if (!/^[0-9]{5,20}$/.test(values.account_number)) {
+      return showError(errorEl, "Nomor rekening hanya berisi angka, 5 sampai 20 digit.");
+    }
+    if (!values.holder) return showError(errorEl, "Nama pemilik rekening wajib diisi.");
+    const restore = busy(event.submitter, "Menyimpan…");
+    const { error } = await supabase.from("bank_accounts").insert(values);
+    restore();
+    if (error) return showError(errorEl, errorMessage(error));
+    done("Rekening ditambahkan");
+  });
+
+  const qrisError = app.querySelector("[data-qris-error]");
+  const qrisInput = app.querySelector("[data-qris-file]");
+  const qrisLabel = app.querySelector("[data-qris-label]");
+  const qrisPreview = app.querySelector("[data-qris-preview]");
+  const qrisEmpty = app.querySelector("[data-qris-empty]");
+  if (settings.qris_path) {
+    qrisBlob(settings.qris_path)
+      .then(blobDataUrl)
+      .then((src) => {
+        qrisPreview.src = src;
+        qrisPreview.hidden = false;
+        qrisEmpty.hidden = true;
+      })
+      .catch((problem) => {
+        qrisEmpty.textContent = "Gambar gagal dimuat";
+        if (seq === renderSeq) showError(qrisError, errorMessage(problem));
+      });
+  }
+  qrisInput.addEventListener("change", async () => {
+    const file = qrisInput.files[0];
+    qrisInput.value = "";
+    if (!file) return;
+    qrisError.hidden = true;
+    const label = qrisLabel.textContent;
+    qrisLabel.textContent = "Mengunggah…";
+    const fail = (text) => {
+      qrisLabel.textContent = label;
+      showError(qrisError, text);
+    };
+    let blob;
+    try {
+      blob = await prepareQris(file);
+    } catch (problem) {
+      return fail(problem.message);
+    }
+    const path = `qris-${randomHex(16)}.png`;
+    const { error: uploadError } = await supabase.storage
+      .from(QRIS_BUCKET)
+      .upload(path, blob, { contentType: "image/png", cacheControl: "31536000" });
+    if (uploadError) return fail(`Gambar gagal diunggah. ${errorMessage(uploadError)}`);
+    const problem = await updateSettings({ qris_path: path });
+    if (problem) {
+      await supabase.storage.from(QRIS_BUCKET).remove([path]);
+      return fail(problem);
+    }
+    if (settings.qris_path) await supabase.storage.from(QRIS_BUCKET).remove([settings.qris_path]);
+    done("Gambar QRIS disimpan");
+  });
+
+  app.querySelector("[data-qris-remove]")?.addEventListener("click", async (event) => {
+    qrisError.hidden = true;
+    if (leavesNoMethod({ qris: null })) return showError(qrisError, LAST_METHOD_MESSAGE);
+    if (!window.confirm("Hapus gambar QRIS? Cara bayar QRIS tidak bisa dipilih lagi untuk tagihan baru.")) return;
+    const restore = busy(event.currentTarget, "Menghapus…");
+    const problem = await updateSettings({ qris_path: null });
+    restore();
+    if (problem) return showError(qrisError, problem);
+    await supabase.storage.from(QRIS_BUCKET).remove([settings.qris_path]);
+    done("Gambar QRIS dihapus");
+  });
+
+  const cashForm = app.querySelector("#cash-form");
+  const cashFields = cashForm.elements;
+  cashFields.tunai_enabled.checked = settings.tunai_enabled;
+  cashFields.tunai_note.value = settings.tunai_note ?? "";
+  cashForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const errorEl = cashForm.querySelector("[data-error]");
+    errorEl.hidden = true;
+    const values = {
+      tunai_enabled: cashFields.tunai_enabled.checked,
+      tunai_note: cashFields.tunai_note.value.replace(/\s+/g, " ").trim() || null,
+    };
+    if (leavesNoMethod({ tunai: values.tunai_enabled })) return showError(errorEl, LAST_METHOD_MESSAGE);
+    const restore = busy(event.submitter, "Menyimpan…");
+    const problem = await updateSettings(values);
+    restore();
+    if (problem) return showError(errorEl, problem);
+    done("Pengaturan tunai disimpan");
+  });
+}
+
 // Akun -----------------------------------------------------------------------
 
 // Token yang tersimpan tetap terlihat sah setelah sesinya diakhiri dari
@@ -2754,9 +3237,11 @@ function route() {
       ? "akun"
       : path === "/laporan"
         ? "laporan"
-        : path === "/menu" || path.startsWith("/menu/")
-          ? "menu"
-          : "pesanan";
+        : path === "/pengaturan"
+          ? "pengaturan"
+          : path === "/menu" || path.startsWith("/menu/")
+            ? "menu"
+            : "pesanan";
   topbar.querySelectorAll("[data-nav]").forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -2766,6 +3251,7 @@ function route() {
   if (path === "/") return renderList();
   if (path === "/akun") return renderAccount();
   if (path === "/laporan") return renderReport();
+  if (path === "/pengaturan") return renderSettings();
   if (path === "/menu") return renderMenu();
   if (path === "/menu/baru") return renderMenuForm(null);
   if ((match = path.match(/^\/menu\/([a-z0-9-]+)$/))) return renderMenuForm(match[1]);

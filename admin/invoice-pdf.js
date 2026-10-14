@@ -29,7 +29,10 @@ function lineHeight(size) {
   return size * LINE_FACTOR * PT_TO_MM;
 }
 
-export function drawInvoicePdf(JsPDF, { invoice, order, store, logo }) {
+const QRIS_MAX_WIDTH = 60;
+const QRIS_MAX_HEIGHT = 85;
+
+export function drawInvoicePdf(JsPDF, { invoice, order, store, logo, qris }) {
   const doc = new JsPDF({ unit: "mm", format: "a4" });
   doc.setLineHeightFactor(LINE_FACTOR);
   doc.setProperties({ title: `${invoice.code} ${store.storeName}` });
@@ -159,7 +162,13 @@ export function drawInvoicePdf(JsPDF, { invoice, order, store, logo }) {
   // Cara bayar
   const boxWidth = RIGHT - LEFT;
   const instructionsHeight = invoice.instructions ? measure(invoice.instructions, 10, boxWidth - 10) : 0;
-  const boxHeight = 15 + instructionsHeight;
+  let qrisSize = null;
+  if (qris) {
+    const { width, height } = doc.getImageProperties(qris);
+    const scale = Math.min(QRIS_MAX_WIDTH / width, QRIS_MAX_HEIGHT / height);
+    qrisSize = { width: width * scale, height: height * scale };
+  }
+  const boxHeight = 15 + instructionsHeight + (qrisSize ? qrisSize.height + 4 : 0);
   ensure(boxHeight + 16);
   doc.setFillColor(...PAPER);
   doc.roundedRect(LEFT, y, boxWidth, boxHeight, 2, 2, "F");
@@ -167,6 +176,11 @@ export function drawInvoicePdf(JsPDF, { invoice, order, store, logo }) {
   text(METHOD_LABEL[invoice.method], LEFT + 5, y + 10.5, { size: 10.5, bold: true });
   if (invoice.instructions) {
     text(invoice.instructions, LEFT + 5, y + 15.5, { size: 10, width: boxWidth - 10 });
+  }
+  if (qrisSize) {
+    const top = y + 12 + instructionsHeight + 2;
+    // Tanpa kompresi, gambar PNG disimpan mentah dan PDF bisa melewati batas 1 MB bucket invoice-pdf.
+    doc.addImage(qris, "PNG", LEFT + 5, top, qrisSize.width, qrisSize.height, "qris", "SLOW");
   }
   y += boxHeight + 8;
 
@@ -202,12 +216,12 @@ function loadLogo() {
   return logoPromise;
 }
 
-export async function invoicePdfFile(invoice, order, store) {
+export async function invoicePdfFile(invoice, order, store, qris = null) {
   libraryPromise ??= import(JSPDF_URL).catch((error) => {
     libraryPromise = null;
     throw error;
   });
   const [{ jsPDF }, logo] = await Promise.all([libraryPromise, loadLogo()]);
-  const doc = drawInvoicePdf(jsPDF, { invoice, order, store, logo });
+  const doc = drawInvoicePdf(jsPDF, { invoice, order, store, logo, qris });
   return new File([doc.output("blob")], `${invoice.code} ${store.storeName}.pdf`, { type: "application/pdf" });
 }

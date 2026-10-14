@@ -665,6 +665,14 @@ textarea.input,
   print-color-adjust: exact;
 }
 
+.doc-qris {
+  width: 100%;
+  max-width: 220px;
+  margin-top: 8px;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .doc-paid {
   color: var(--ok);
   font-weight: 600;
@@ -1238,6 +1246,12 @@ a.unpaid-row {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.qris-frame {
+  aspect-ratio: 1;
+  background: #fff;
+  border: 1px solid var(--line);
 }
 
 .photo-btn {
